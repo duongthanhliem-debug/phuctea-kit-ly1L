@@ -237,6 +237,24 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
 .toast.show{display:block;animation:slideUp .3s ease;}
 @keyframes slideUp{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
 .loading-row td{text-align:center;color:var(--gray);padding:30px!important;font-size:13px;}
+
+/* CHECKLIST IDENTITY */
+.cl-identity{background:var(--white);border-radius:var(--radius);padding:16px 20px;margin-bottom:14px;box-shadow:var(--shadow);border:1px solid var(--border);display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;}
+.cl-identity .form-group{flex:1;min-width:160px;}
+.cl-identity .form-group label{font-size:11px;font-weight:700;color:var(--mid);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:5px;}
+.cl-identity .form-group input{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-family:inherit;font-size:13px;color:var(--dark);outline:none;transition:border-color .15s;}
+.cl-identity .form-group input:focus{border-color:var(--red);}
+.cl-identity-note{font-size:11px;color:var(--gray);margin-bottom:14px;padding:8px 14px;background:var(--lgray);border-radius:8px;}
+.cl-progress{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.cl-progress-bar{flex:1;height:8px;background:var(--lgray);border-radius:4px;overflow:hidden;}
+.cl-progress-fill{height:100%;background:var(--green);border-radius:4px;transition:width .3s;}
+.cl-progress-text{font-size:11px;font-weight:700;color:var(--mid);white-space:nowrap;}
+.confirm-day-btn{width:100%;padding:12px;border:none;border-radius:10px;font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;transition:all .15s;margin-top:12px;}
+.confirm-day-btn.day1{background:var(--blue);color:white;}
+.confirm-day-btn.day2{background:var(--green);color:white;}
+.confirm-day-btn:hover{filter:brightness(1.1);transform:translateY(-1px);}
+.confirm-day-btn:disabled{background:var(--border);color:var(--gray);cursor:not-allowed;transform:none;}
+.cl-sent-badge{display:inline-flex;align-items:center;gap:6px;background:#EAFAF1;border:1px solid var(--green);color:var(--green);font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;margin-top:8px;}
 </style>
 </head>
 <body>
@@ -294,7 +312,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
         </tr>
       </thead>
       <tbody>
-        <tr><td>Lượng nước</td><td>600ml</td><td class="muted">1.000ml</td><td class="highlight">1.000ml ✓</td></tr>
+        <tr><Dung tích ly</td><td>600ml</td><td class="muted">1.000ml</td><td class="highlight">1.000ml ✓</td></tr>
         <tr><td>Lượng topping</td><td>Tiêu chuẩn M</td><td class="muted">Nhiều hơn (chuẩn Xô)</td><td class="highlight">Tiêu chuẩn M ✓</td></tr>
         <tr><td>Giá niêm yết</td><td>Giá M</td><td class="muted">Giá M + 5K→9K</td><td class="highlight">Giá M* hoặc +2K ✓</td></tr>
         <tr><td>Vật dụng</td><td>Ly 600ml + nắp</td><td class="muted">Xô + nắp + bịch</td><td class="highlight">Ly PP 900ml + màng ép</td></tr>
@@ -321,15 +339,37 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
   </div>
 
   <div class="sec-label"><div class="dot"></div><h3>Checklist chuyển đổi 2 ngày</h3></div>
-  <p style="font-size:12px;color:var(--gray);margin-bottom:14px">Mỗi ngày 4–6 tiếng · Tick vào ô để theo dõi tiến độ</p>
+
+  <div class="cl-identity">
+    <div class="form-group">
+      <label>Mã cửa hàng</label>
+      <input type="text" id="cl-code" placeholder="VD: PHUCTEA165 - LÊ LỢI ST" oninput="onIdentityChange()">
+    </div>
+    <div class="form-group">
+      <label>Họ tên người thực hiện</label>
+      <input type="text" id="cl-name" placeholder="Họ tên của bạn" oninput="onIdentityChange()">
+    </div>
+  </div>
+  <p class="cl-identity-note">Nhập mã CH + họ tên để checklist lưu riêng theo bạn · Tick vào ô để theo dõi tiến độ · Nhấn "Xác nhận" cuối ngày để gửi lên hệ thống</p>
+
   <div class="checklist-grid">
     <div class="checklist-col">
       <div class="checklist-header blue"><div class="day-num">1</div>NGÀY 1 · Chuyển đổi + Đào tạo</div>
       <div class="checklist-body" id="day1-list"></div>
+      <div style="padding:10px 14px">
+        <div class="cl-progress"><div class="cl-progress-bar"><div class="cl-progress-fill" id="prog1-fill" style="width:0%"></div></div><span class="cl-progress-text" id="prog1-text">0/10</span></div>
+        <button class="confirm-day-btn day1" id="confirm-day1" onclick="confirmDay(1)">Xác nhận hoàn thành Ngày 1 → Gửi lên hệ thống</button>
+        <div id="sent-badge-1" style="display:none"><div class="cl-sent-badge">✓ Đã gửi lên hệ thống</div></div>
+      </div>
     </div>
     <div class="checklist-col">
       <div class="checklist-header green"><div class="day-num">2</div>NGÀY 2 · Thực chiến + Kiểm tra</div>
       <div class="checklist-body" id="day2-list"></div>
+      <div style="padding:10px 14px">
+        <div class="cl-progress"><div class="cl-progress-bar"><div class="cl-progress-fill" id="prog2-fill" style="width:0%"></div></div><span class="cl-progress-text" id="prog2-text">0/10</span></div>
+        <button class="confirm-day-btn day2" id="confirm-day2" onclick="confirmDay(2)">Xác nhận hoàn thành Ngày 2 → Gửi lên hệ thống</button>
+        <div id="sent-badge-2" style="display:none"><div class="cl-sent-badge">✓ Đã gửi lên hệ thống</div></div>
+      </div>
     </div>
   </div>
 </div>
@@ -653,17 +693,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
       <tbody id="dashboard-body"><tr class="loading-row"><td colspan="10">Đang tải dữ liệu...</td></tr></tbody>
     </table>
   </div>
-  <div class="setup-box" style="margin-top:28px">
-    <h3>⚙️ Hướng dẫn kết nối Google Sheets (Admin)</h3>
-    <p style="color:rgba(255,255,255,.6);font-size:12px;margin-bottom:12px">Thực hiện một lần duy nhất để kích hoạt lưu dữ liệu thật:</p>
-    <ol>
-      <li>Tạo Google Sheet mới → vào <strong>Extensions → Apps Script</strong></li>
-      <li>Dán đoạn code Apps Script (xem file <code>appsscript.gs</code> đính kèm)</li>
-      <li>Deploy → <strong>New deployment → Web app</strong> → Execute as: <em>Me</em> → Access: <em>Anyone</em></li>
-      <li>Copy <strong>Web app URL</strong> → dán vào biến <code>APPS_SCRIPT_URL</code> trong <code>index.html</code></li>
-      <li>Copy <strong>Sheet ID</strong> từ URL → dán vào <code>SHEET_ID</code></li>
-    </ol>
-  </div>
+
 </div>
 </div>
 
@@ -712,21 +742,96 @@ const DAY2 = [
   "Đội setup hoàn thành Báo cáo KPI gửi BOD",
 ];
 
-function renderChecklist(items, containerId, prefix) {
+// ── Checklist key theo mã CH + tên + ngày ──────────────────
+function clKey(day) {
+  const code = document.getElementById("cl-code").value.trim();
+  const name = document.getElementById("cl-name").value.trim();
+  const date = new Date().toISOString().slice(0,10);
+  return `cl_${code}_${name}_d${day}_${date}`.replace(/\s+/g,"_");
+}
+function sentKey(day) { return clKey(day) + "_sent"; }
+
+function onIdentityChange() {
+  renderChecklist(DAY1, "day1-list", 1);
+  renderChecklist(DAY2, "day2-list", 2);
+}
+
+function renderChecklist(items, containerId, day) {
   const el = document.getElementById(containerId);
+  const prefix = clKey(day);
   const saved = JSON.parse(localStorage.getItem(prefix) || "{}");
   el.innerHTML = items.map((item, i) => `
     <div class="check-item">
-      <div class="check-box ${saved[i]?'checked':''}" onclick="toggleCheck(this,'${prefix}',${i})"></div>
+      <div class="check-box ${saved[i]?'checked':''}" onclick="toggleCheck(this,${day},${i})"></div>
       <span>${item}</span>
     </div>`).join("");
+  updateProgress(day, saved, items.length);
+  // show sent badge if already sent
+  const sent = localStorage.getItem(sentKey(day));
+  document.getElementById(`sent-badge-${day}`).style.display = sent ? "block" : "none";
+  document.getElementById(`confirm-day${day}`).disabled = !!sent;
 }
 
-function toggleCheck(el, prefix, idx) {
+function toggleCheck(el, day, idx) {
   el.classList.toggle("checked");
+  const prefix = clKey(day);
   const saved = JSON.parse(localStorage.getItem(prefix) || "{}");
   saved[idx] = el.classList.contains("checked");
   localStorage.setItem(prefix, JSON.stringify(saved));
+  const items = day===1 ? DAY1 : DAY2;
+  updateProgress(day, saved, items.length);
+}
+
+function updateProgress(day, saved, total) {
+  const done = Object.values(saved).filter(Boolean).length;
+  const pct = Math.round((done/total)*100);
+  document.getElementById(`prog${day}-fill`).style.width = pct+"%";
+  document.getElementById(`prog${day}-text`).textContent = `${done}/${total}`;
+}
+
+async function confirmDay(day) {
+  const code = document.getElementById("cl-code").value.trim();
+  const name = document.getElementById("cl-name").value.trim();
+  if (!code || !name) { showToast("Nhập mã cửa hàng và họ tên trước nha!","error"); return; }
+
+  const items = day===1 ? DAY1 : DAY2;
+  const prefix = clKey(day);
+  const saved = JSON.parse(localStorage.getItem(prefix) || "{}");
+  const done = items.filter((_,i) => saved[i]).length;
+  const checklist = items.map((item,i) => (saved[i]?"✓ ":"✗ ") + item).join(" | ");
+  const date = new Date().toISOString().slice(0,10);
+
+  const payload = {
+    type: "checklist",
+    code, name, date, day,
+    total: items.length, done,
+    checklist,
+    timestamp: new Date().toLocaleString("vi-VN"),
+  };
+
+  const btn = document.getElementById(`confirm-day${day}`);
+  btn.disabled = true;
+  btn.textContent = "Đang gửi...";
+
+  if (APPS_SCRIPT_URL === "PASTE_YOUR_APPS_SCRIPT_URL_HERE") {
+    localStorage.setItem(sentKey(day), "1");
+    document.getElementById(`sent-badge-${day}`).style.display = "block";
+    showToast(`✅ Demo: Ngày ${day} hoàn thành ${done}/${items.length} mục`,"success");
+    btn.textContent = "✅ Đã xác nhận!";
+    return;
+  }
+
+  try {
+    await fetch(APPS_SCRIPT_URL, {method:"POST",mode:"no-cors",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+    localStorage.setItem(sentKey(day), "1");
+    document.getElementById(`sent-badge-${day}`).style.display = "block";
+    showToast(`✅ Ngày ${day}: ${done}/${items.length} mục — đã gửi lên hệ thống!`,"success");
+    btn.textContent = "✅ Đã xác nhận!";
+  } catch(e) {
+    showToast("Lỗi kết nối, thử lại nha!","error");
+    btn.disabled = false;
+    btn.textContent = day===1 ? "Xác nhận hoàn thành Ngày 1 → Gửi lên hệ thống" : "Xác nhận hoàn thành Ngày 2 → Gửi lên hệ thống";
+  }
 }
 
 function showToast(msg, type="success") {
@@ -836,8 +941,8 @@ function parseCSV(text) {
 }
 
 document.getElementById("f-date").valueAsDate=new Date();
-renderChecklist(DAY1,"day1-list","cl-day1");
-renderChecklist(DAY2,"day2-list","cl-day2");
+renderChecklist(DAY1,"day1-list",1);
+renderChecklist(DAY2,"day2-list",2);
 loadDashboard();
 </script>
 </body>
