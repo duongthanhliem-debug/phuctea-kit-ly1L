@@ -649,7 +649,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
   <div class="sec-label"><div class="dot"></div><h3>Báo cáo từng cửa hàng</h3></div>
   <div class="reports-table-wrap">
     <table class="reports-table">
-      <thead><tr><th>Cửa hàng</th><th>Ngày</th><th>Ngày BC</th><th>Tổng đơn</th><th>Ly 1L</th><th>Tỷ lệ upsell</th><th>SĐT thu</th><th>Clip</th><th>Mức KPI</th><th>Đội setup</th></tr></thead>
+      <thead><tr><th>Mã cửa hàng</th><th>Ngày</th><th>Tổng đơn</th><th>Đơn Ly 1L</th><th>Ly 1L bán ra</th><th>Tỷ lệ upsell</th><th>SĐT thu</th><th>Clip</th><th>Mức KPI</th><th>Người thực hiện</th></tr></thead>
       <tbody id="dashboard-body"><tr class="loading-row"><td colspan="10">Đang tải dữ liệu...</td></tr></tbody>
     </table>
   </div>
@@ -783,16 +783,17 @@ async function loadDashboard() {
   body.innerHTML = '<tr class="loading-row"><td colspan="10">⏳ Đang tải...</td></tr>';
   if (SHEET_ID === "PASTE_YOUR_SHEET_ID_HERE") {
     renderDashboard([
-      {store:"Phúc Tea Hà Lam",date:"01/06/2026",day:"Ngày 2",total:"87",ly1l:"31",rate:"35.6",sdt:"25",clip:"Có",kpi:"XUẤT SẮC",name:"Nguyễn Văn A"},
-      {store:"Phúc Tea Cần Thơ",date:"02/06/2026",day:"Ngày 1",total:"64",ly1l:"18",rate:"28.1",sdt:"14",clip:"Có",kpi:"ĐẠT",name:"Trần Thị B"},
-      {store:"Phúc Tea Vĩnh Long",date:"02/06/2026",day:"Ngày 1",total:"52",ly1l:"9",rate:"17.3",sdt:"7",clip:"Không",kpi:"CẦN CẢI THIỆN",name:"Lê Văn C"},
+      {store:"PHUCTEA001 - HÀ LAM",date:"01/06/2026",total:"87",ly1l:"31",ly1lSold:"31",rate:"35.6",sdt:"25",clip:"Có",kpi:"XUẤT SẮC",name:"Nguyễn Văn A"},
+      {store:"PHUCTEA165 - LÊ LỢI ST",date:"02/06/2026",total:"64",ly1l:"18",ly1lSold:"18",rate:"28.1",sdt:"14",clip:"Có",kpi:"ĐẠT",name:"Trần Thị B"},
+      {store:"PHUCTEA032 - VĨNH LONG",date:"02/06/2026",total:"52",ly1l:"9",ly1lSold:"9",rate:"17.3",sdt:"7",clip:"Không",kpi:"CẦN CẢI THIỆN",name:"Lê Văn C"},
     ]); return;
   }
   try {
     const url=`https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&gid=${SHEET_GID}`;
     const text=await (await fetch(url)).text();
     const rows=parseCSV(text).slice(1);
-    renderDashboard(rows.map(r=>({timestamp:r[0],store:r[1],code:r[2],name:r[3],date:r[4],day:r[5]?"Ngày "+r[5]:"",total:r[9],ly1l:r[12],rate:r[13],kpi:r[14],sdt:r[17],clip:r[20]})).filter(r=>r.store));
+    // A=time,B=code,C=name,D=date,E=owner,F=trained,G=total,H=ly1l,I=ly1lSold,J=rate,K=kpi,L=sdt,M=neg,N=clip
+    renderDashboard(rows.map(r=>({store:r[1],date:r[3],day:"",total:r[6],ly1l:r[7],ly1lSold:r[8],rate:r[9],kpi:r[10],sdt:r[11],clip:r[13],name:r[2]})).filter(r=>r.store));
   } catch(e) {
     body.innerHTML='<tr class="loading-row"><td colspan="10">❌ Không tải được. Kiểm tra Sheet ID.</td></tr>';
   }
@@ -803,8 +804,9 @@ function renderDashboard(rows) {
   if(!rows.length){body.innerHTML='<tr class="loading-row"><td colspan="10">Chưa có báo cáo.</td></tr>';updateStats([]);return;}
   const cls={"XUẤT SẮC":"xuat-sac","ĐẠT":"dat","CẦN CẢI THIỆN":"can","CHƯA ĐẠT":"chua"};
   body.innerHTML=rows.map(r=>`<tr>
-    <td><strong>${r.store||"—"}</strong></td><td>${r.date||"—"}</td><td>${r.day||"—"}</td>
-    <td>${r.total||"—"}</td><td>${r.ly1l||"—"}</td><td><strong>${r.rate||"—"}%</strong></td>
+    <td><strong>${r.store||"—"}</strong></td><td>${r.date||"—"}</td>
+    <td>${r.total||"—"}</td><td>${r.ly1l||"—"}</td><td>${r.ly1lSold||"—"}</td>
+    <td><strong>${r.rate||"—"}%</strong></td>
     <td>${r.sdt||"—"}</td><td>${r.clip||"—"}</td>
     <td><span class="badge-kpi ${cls[r.kpi]||'dat'}">${r.kpi||"—"}</span></td>
     <td>${r.name||"—"}</td></tr>`).join("");
