@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
-<head>
+<link rel="icon" type="image/png" href="logo-brand-black.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Phúc Tea · Bộ Kit Chuyển Đổi Ly 1L</title>
@@ -236,6 +236,28 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
 .toast.success{background:var(--green);} .toast.error{background:var(--red);}
 .toast.show{display:block;animation:slideUp .3s ease;}
 @keyframes slideUp{from{transform:translateY(20px);opacity:0;}to{transform:translateY(0);opacity:1;}}
+
+/* CHECKLIST DASHBOARD */
+.cl-dash-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:14px;margin-bottom:8px;}
+.cl-dash-card{background:var(--white);border-radius:var(--radius);box-shadow:var(--shadow);border:1px solid var(--border);overflow:hidden;}
+.cl-dash-card-header{padding:12px 16px;display:flex;align-items:center;justify-content:space-between;gap:8px;border-bottom:1px solid var(--lgray);}
+.cl-dash-card-header .store{font-size:12px;font-weight:800;color:var(--dark);}
+.cl-dash-card-header .person{font-size:11px;color:var(--gray);}
+.cl-dash-card-header .date{font-size:10px;color:var(--gray);white-space:nowrap;}
+.cl-day-row{padding:10px 16px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--lgray);}
+.cl-day-row:last-child{border-bottom:none;}
+.cl-day-label{font-size:11px;font-weight:700;color:var(--mid);width:52px;flex-shrink:0;}
+.cl-day-bar{flex:1;height:10px;background:var(--lgray);border-radius:5px;overflow:hidden;}
+.cl-day-bar-fill{height:100%;border-radius:5px;transition:width .4s;}
+.cl-day-count{font-size:11px;font-weight:700;color:var(--mid);width:34px;text-align:right;flex-shrink:0;}
+.cl-day-badge{font-size:9px;font-weight:700;padding:2px 8px;border-radius:10px;color:white;flex-shrink:0;}
+.cl-day-badge.done{background:var(--green);}
+.cl-day-badge.partial{background:var(--orange);}
+.cl-day-badge.pending{background:var(--border);color:var(--gray);}
+.cl-summary-bar{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px;}
+.cl-summary-stat{background:var(--white);border-radius:var(--radius);padding:14px;box-shadow:var(--shadow);border:1px solid var(--border);text-align:center;}
+.cl-summary-stat .val{font-size:26px;font-weight:900;color:var(--dark);}
+.cl-summary-stat .lbl{font-size:10px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.5px;margin-top:3px;}
 .loading-row td{text-align:center;color:var(--gray);padding:30px!important;font-size:13px;}
 
 /* CHECKLIST IDENTITY */
@@ -686,6 +708,17 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
     <div class="stat-card green"><div class="stat-label">Tỷ lệ upsell TB</div><div class="stat-value" id="s-avg-rate">—</div><div class="stat-unit">%</div></div>
     <div class="stat-card orange"><div class="stat-label">SĐT thu được</div><div class="stat-value" id="s-total-sdt">—</div></div>
   </div>
+  <div class="cl-summary-bar">
+    <div class="cl-summary-stat"><div class="val" id="cl-s-stores">—</div><div class="lbl">CH đã gửi checklist</div></div>
+    <div class="cl-summary-stat"><div class="val" id="cl-s-done">—</div><div class="lbl">Lượt hoàn thành 100%</div></div>
+    <div class="cl-summary-stat"><div class="val" id="cl-s-avg">—</div><div class="lbl">Tỷ lệ hoàn thành TB</div></div>
+  </div>
+
+  <div class="sec-label"><div class="dot"></div><h3>Tiến độ checklist từng cửa hàng</h3></div>
+  <div class="cl-dash-grid" id="cl-dash-grid">
+    <div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:20px;font-size:13px">Đang tải...</div>
+  </div>
+
   <div class="sec-label"><div class="dot"></div><h3>Báo cáo từng cửa hàng</h3></div>
   <div class="reports-table-wrap">
     <table class="reports-table">
@@ -700,7 +733,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
 <div class="toast" id="toast"></div>
 
 <script>
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwz5-tiUBpYq8Gw46cDEgk--NxbnJaOE2iYLAZd5N_cQtLZSjB9tml9wh4Yf4Puih1YWw/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxEtJ76pu2gGh46s8zeq7j4qLGCmEfMPFccTGcQiZds57XyV7DfHlxiiq7BaatMsRxq3g/exec";
 const SHEET_ID        = "1qCXKM-1raCAwuTJ12u-J--7iei9JrllRggmM6EclgIE";
 const SHEET_GID       = "1222571622"; // tab KPI_LY1L
 
@@ -883,9 +916,80 @@ async function submitKPI() {
   }
 }
 
+async function loadChecklist() {
+  const grid = document.getElementById("cl-dash-grid");
+  const CHECKLIST_GID = ""; // sẽ tự detect
+  // Thử fetch tab CHECKLIST — GID có thể khác, dùng tên sheet
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=CHECKLIST`;
+  try {
+    const text = await (await fetch(url)).text();
+    const rows = parseCSV(text).slice(1).filter(r => r[1]); // bỏ header, lọc dòng có data
+
+    if (!rows.length) {
+      grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:20px;font-size:13px">Chưa có checklist nào được gửi lên.</div>';
+      return;
+    }
+
+    // Nhóm theo mã CH + ngày
+    const map = {};
+    rows.forEach(r => {
+      const key = `${r[1]}__${r[3]}`; // mã CH + ngày
+      if (!map[key]) map[key] = { code: r[1], name: r[2], date: r[3], days: {} };
+      map[key].days[r[4]] = { done: +r[5]||0, total: +r[6]||0 };
+    });
+
+    const cards = Object.values(map);
+
+    // Summary stats
+    const totalDone = cards.reduce((s,c) => {
+      const d = Object.values(c.days);
+      return s + d.filter(x => x.done >= x.total && x.total > 0).length;
+    }, 0);
+    const avgPct = cards.length ? Math.round(
+      cards.reduce((s,c) => {
+        const d = Object.values(c.days);
+        const avg = d.length ? d.reduce((a,x) => a + (x.total>0?x.done/x.total:0), 0)/d.length : 0;
+        return s + avg;
+      }, 0) / cards.length * 100
+    ) : 0;
+
+    document.getElementById("cl-s-stores").textContent = new Set(cards.map(c=>c.code)).size || "—";
+    document.getElementById("cl-s-done").textContent = totalDone || "—";
+    document.getElementById("cl-s-avg").textContent = (avgPct||"—") + (avgPct?"%":"");
+
+    grid.innerHTML = cards.map(c => {
+      const dayRows = [1,2].map(d => {
+        const info = c.days[d];
+        if (!info) return `<div class="cl-day-row"><div class="cl-day-label">Ngày ${d}</div><div class="cl-day-bar"><div class="cl-day-bar-fill" style="width:0%;background:var(--border)"></div></div><div class="cl-day-count">—</div><div class="cl-day-badge pending">Chưa</div></div>`;
+        const pct = info.total > 0 ? Math.round(info.done/info.total*100) : 0;
+        const color = pct>=100?"var(--green)":pct>=60?"var(--orange)":"var(--red)";
+        const badge = pct>=100?"done":pct>0?"partial":"pending";
+        const badgeTxt = pct>=100?"Xong":pct>0?pct+"%":"0%";
+        return `<div class="cl-day-row">
+          <div class="cl-day-label">Ngày ${d}</div>
+          <div class="cl-day-bar"><div class="cl-day-bar-fill" style="width:${pct}%;background:${color}"></div></div>
+          <div class="cl-day-count">${info.done}/${info.total}</div>
+          <div class="cl-day-badge ${badge}">${badgeTxt}</div>
+        </div>`;
+      }).join("");
+      return `<div class="cl-dash-card">
+        <div class="cl-dash-card-header">
+          <div><div class="store">${c.code}</div><div class="person">👤 ${c.name}</div></div>
+          <div class="date">📅 ${c.date}</div>
+        </div>
+        ${dayRows}
+      </div>`;
+    }).join("");
+
+  } catch(e) {
+    grid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--gray);padding:20px;font-size:13px">❌ Không tải được checklist.</div>';
+  }
+}
+
 async function loadDashboard() {
   const body = document.getElementById("dashboard-body");
   body.innerHTML = '<tr class="loading-row"><td colspan="10">⏳ Đang tải...</td></tr>';
+  loadChecklist();
   if (SHEET_ID === "PASTE_YOUR_SHEET_ID_HERE") {
     renderDashboard([
       {store:"PHUCTEA001 - HÀ LAM",date:"01/06/2026",total:"87",ly1l:"31",ly1lSold:"31",rate:"35.6",sdt:"25",clip:"Có",kpi:"XUẤT SẮC",name:"Nguyễn Văn A"},
