@@ -996,7 +996,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
     </div>
     <div class="modal-footer" id="bb-footer">
       <button class="camera-btn retake" id="bb-btn-back" style="display:none" onclick="bbBack()">← Quay lại</button>
-      <button class="camera-btn retake" id="bb-btn-save" style="display:none" onclick="saveBienBanOnly()">💾 Lưu</button>
+      <button class="submit-btn" style="width:auto;padding:11px 28px;display:none" id="bb-btn-save" onclick="saveBienBanOnly()">💾 Lưu biên bản</button>
       <button class="submit-btn" style="width:auto;padding:11px 28px" id="bb-btn-next" onclick="bbNext()">Tiếp theo →</button>
     </div>
   </div>
@@ -1481,7 +1481,8 @@ function bbShowStep(step) {
   });
   document.getElementById('bb-step-label').textContent = `Bước ${step}/4 — ${['','Thông tin','Chữ ký','Ảnh nhóm','Xem trước & Xuất PDF'][step]}`;
   document.getElementById('bb-btn-back').style.display = step > 1 ? 'block' : 'none';
-  document.getElementById('bb-btn-next').textContent = step < 4 ? 'Tiếp theo →' : '⬇️ Tải PDF';
+  document.getElementById('bb-btn-next').style.display = step < 4 ? 'block' : 'none';
+  document.getElementById('bb-btn-next').textContent = 'Tiếp theo →';
   document.getElementById('bb-btn-save').style.display = step === 4 ? 'block' : 'none';
   bbStep = step;
   if (step === 2) initSigPads();
@@ -1870,21 +1871,38 @@ function printBBHtml(htmlContent, code, date) {
 
 // ── Xuất PDF ─────────────────────────────────────────────────
 async function saveBienBanOnly() {
+  // Kiểm tra đủ thông tin
+  const code  = document.getElementById('bb-code').value.trim();
+  const setup = document.getElementById('bb-setup-name').value.trim();
+  const owner = document.getElementById('bb-owner').value.trim();
+  const date  = document.getElementById('bb-date').value;
+  if (!code || !setup || !owner || !date) {
+    showToast('Vui lòng điền đầy đủ thông tin trước khi lưu!','error');
+    bbShowStep(1); return;
+  }
+  const nvList = getNhanVienList();
+  if (!nvList.length) {
+    showToast('Vui lòng thêm ít nhất 1 nhân viên!','error');
+    bbShowStep(1); return;
+  }
+
   const btn = document.getElementById('bb-btn-save');
   btn.disabled = true;
   btn.textContent = '⏳ Đang lưu...';
+
   const bbContent = document.getElementById('bb-preview').innerHTML;
   await saveBienBan({
-    code    : document.getElementById('bb-code').value.trim(),
-    date    : document.getElementById('bb-date').value,
-    setup   : document.getElementById('bb-setup-name').value.trim(),
-    nvCount : getNhanVienList().length,
+    code, date, setup, owner,
+    nvCount: nvList.length,
     htmlContent: bbContent,
-    savedAt : new Date().toLocaleString('vi-VN'),
+    savedAt: new Date().toLocaleString('vi-VN'),
   });
-  showToast('✅ Đã lưu biên bản! Xem lại ở tab Biên Bản.','success');
-  btn.textContent = '✅ Đã lưu';
-  setTimeout(() => { btn.textContent = '💾 Lưu'; btn.disabled = false; }, 2500);
+
+  showToast('✅ Đã lưu! Vào tab Biên Bản để xem và xuất PDF.','success');
+  btn.textContent = '💾 Lưu biên bản';
+  btn.disabled = false;
+  // Tự đóng modal sau 1 giây
+  setTimeout(() => closeModal('modal-bienban'), 1000);
 }
 
 async function exportPDF() {
