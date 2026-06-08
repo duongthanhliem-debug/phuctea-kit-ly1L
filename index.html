@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="vi">
-<head>
+<link rel="icon" type="image/png" href="logo.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Phúc Tea · Bộ Kit Chuyển Đổi Ly 1L</title>
@@ -1003,7 +1003,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
 </div>
 
 <script>
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwSTCZDJM94AwVH8TBw-YKtwT_oEJ8mKYsEygcVR3535LbMfsyPv3dS6SZd_VveOoE1rQ/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwUWdsQNKiE1dTD95oKHK-bL8hNEK851pTQrE-IQ-8ZK2TvCHSOoYJ57nocMXEZ8cEmeg/exec";
 const SHEET_ID        = "1qCXKM-1raCAwuTJ12u-J--7iei9JrllRggmM6EclgIE";
 const SHEET_GID       = "1222571622"; // tab KPI_LY1L
 
@@ -1803,8 +1803,15 @@ function exportSavedPDF(idx) {
 
 function printBBHtml(htmlContent, code, date) {
   const safeCode = (code || 'bienban').replace(/[^a-zA-Z0-9]/g,'_');
-  const win = window.open('','_blank');
-  win.document.write(`<!DOCTYPE html><html><head>
+  // Dùng iframe ẩn thay window.open để tránh popup blocker
+  const old = document.getElementById('_pf'); if(old) old.remove();
+  const iframe = document.createElement('iframe');
+  iframe.id = '_pf';
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:800px;height:600px;border:0;';
+  document.body.appendChild(iframe);
+  const idoc = iframe.contentDocument || iframe.contentWindow.document;
+  idoc.open();
+  idoc.write(`<!DOCTYPE html><html><head>
     <meta charset="UTF-8">
     <title>Biên bản đào tạo - ${safeCode} - ${date}</title>
     <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -1831,8 +1838,8 @@ function printBBHtml(htmlContent, code, date) {
       @media print{body{padding:10px;}}
     </style>
   </head><body>${htmlContent}</body></html>`);
-  win.document.close();
-  setTimeout(() => win.print(), 800);
+  idoc.close();
+  setTimeout(() => { iframe.contentWindow.print(); }, 700);
 }
 
 // ── Xuất PDF ─────────────────────────────────────────────────
@@ -1875,9 +1882,9 @@ async function exportPDF() {
     // Dùng print window để xuất PDF — không cần thư viện nặng
     const code = bbCode.replace(/[^a-zA-Z0-9]/g,'_');
     const date = bbDate;
-    const win = window.open('','_blank');
+    // printBBHtml xử lý việc mở cửa sổ in
     printBBHtml(bbContent, code, date);
-    setTimeout(() => { btn.textContent='⬇️ Tải PDF'; btn.disabled=false; }, 1000);
+    setTimeout(() => { btn.textContent='⬇️ Tải PDF'; btn.disabled=false; }, 1500);
   } catch(e) {
     showToast('Lỗi tạo PDF. Thử lại nha!','error');
     btn.textContent='⬇️ Tải PDF'; btn.disabled=false;
