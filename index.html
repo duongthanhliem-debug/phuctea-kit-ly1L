@@ -1744,7 +1744,7 @@ function renderBBPreview() {
       </div>
       <div class="bb-sig-box">
         <div class="role">Phúc Tea · Ops</div>
-        <div style="height:60px;display:flex;align-items:center;justify-content:center;color:#BDC3C7;font-size:10px">Xác nhận từ hệ thống</div>
+        <div style="height:60px;display:flex;align-items:center;justify-content:center;color:#BDC3C7;font-size:10px">Hệ thống đã xác nhận</div>
         <div style="font-size:10px;margin-top:6px;color:#95A5A6">${now}</div>
       </div>
     </div>
@@ -2025,7 +2025,7 @@ function rebuildBBHtml(bb) {
     <div class="bb-sig-grid">
       <div class="bb-sig-box"><div class="role">Đội Setup</div>${bb.sigSetup ? `<img src="${bb.sigSetup}" style="height:60px;object-fit:contain;width:100%">` : ''}<div style="font-size:10px;margin-top:6px;font-weight:600">${bb.setup||''}</div></div>
       <div class="bb-sig-box"><div class="role">Chủ / QL Cửa Hàng</div>${bb.sigOwner ? `<img src="${bb.sigOwner}" style="height:60px;object-fit:contain;width:100%">` : ''}<div style="font-size:10px;margin-top:6px;font-weight:600">${bb.owner||''}</div></div>
-      <div class="bb-sig-box"><div class="role">Phúc Tea · Ops</div><div style="height:60px;display:flex;align-items:center;justify-content:center;color:#BDC3C7;font-size:10px">Xác nhận từ hệ thống</div><div style="font-size:10px;margin-top:6px;color:#95A5A6">${bb.savedAt||''}</div></div>
+      <div class="bb-sig-box"><div class="role">Phúc Tea · Ops</div><div style="height:60px;display:flex;align-items:center;justify-content:center;color:#BDC3C7;font-size:10px">Hệ thống đã xác nhận</div><div style="font-size:10px;margin-top:6px;color:#95A5A6">${bb.savedAt||''}</div></div>
     </div>
     <div class="bb-footer">Tài liệu nội bộ · Phúc Tea Operations · Xuất lúc ${bb.savedAt||''}</div>`;
 }
