@@ -498,9 +498,12 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
     </div>
   </div>
 
-  <div style="margin-top:20px;text-align:center">
-    <button onclick="openBienBan()" style="background:linear-gradient(135deg,var(--red),var(--dred));color:white;border:none;border-radius:12px;padding:14px 32px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(192,57,43,0.3);transition:transform .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+  <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+    <button onclick="openBienBan()" style="background:linear-gradient(135deg,var(--red),var(--dred));color:white;border:none;border-radius:12px;padding:14px 28px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(192,57,43,0.3);transition:transform .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
       📋 Lập Biên Bản Ký Xác Nhận Đào Tạo
+    </button>
+    <button onclick="exportKitPDF()" style="background:linear-gradient(135deg,#2C3E50,#1A1A2E);color:white;border:none;border-radius:12px;padding:14px 28px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.2);transition:transform .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+      📄 Xuất Bộ Kit PDF
     </button>
   </div>
 
@@ -1370,7 +1373,9 @@ function renderDashboard(rows) {
 
 function updateStats(rows) {
   document.getElementById("s-stores").textContent=new Set(rows.map(r=>r.store).filter(Boolean)).size||"—";
-  document.getElementById("s-total-ly1l").textContent=rows.reduce((s,r)=>s+(+r.ly1l||0),0)||"—";
+  // Tỷ lệ bán Ly 1L TB = TB (ly1lSold / tổng ly trừ CF+online) các CH có đủ số liệu
+  const cupRates=rows.map(r=>+r.ly1lCupRate).filter(v=>!isNaN(v)&&v>0);
+  document.getElementById("s-total-ly1l").textContent=cupRates.length?(cupRates.reduce((a,b)=>a+b,0)/cupRates.length).toFixed(1):"—";
   const rates=rows.map(r=>+r.upsellRate).filter(v=>!isNaN(v)&&v>0);
   document.getElementById("s-avg-rate").textContent=rates.length?(rates.reduce((a,b)=>a+b,0)/rates.length).toFixed(1):"—";
   const loyaltyRates=rows.map(r=>+r.loyalty).filter(v=>!isNaN(v)&&v>0);
@@ -1391,44 +1396,50 @@ function showChecklistDetail(code, name, date, days, taskDetails) {
 
   [1,2].forEach(d => {
     const info = days[d];
-    if (!info) return;
+    const items = d===1 ? DAY1 : DAY2;
     const color = d===1 ? 'var(--blue)' : 'var(--green)';
+    const bgColor = d===1 ? '#EBF5FB' : '#EAFAF1';
+    const done = info ? (info.done||0) : 0;
+    const total = items.length;
+
     html += `<div style="margin-bottom:16px">
-      <div style="font-size:11px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding:6px 12px;background:${d===1?'#EBF5FB':'#EAFAF1'};border-radius:6px">
-        NGÀY ${d} — ${info.done||0}/${info.total||10} mục hoàn thành
+      <div style="font-size:11px;font-weight:800;color:${color};text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px;padding:6px 12px;background:${bgColor};border-radius:6px">
+        NGÀY ${d} — ${done}/${total} mục hoàn thành
       </div>`;
 
-    const items = d===1 ? DAY1 : DAY2;
-    // Parse checklist string từ Sheet nếu có
+    // Build checkedMap từ nhiều nguồn ưu tiên theo thứ tự
     let checkedMap = {};
     let timeMap = {};
-    if (info.checklistStr) {
-      info.checklistStr.split(' | ').forEach((item,i) => {
-        if (item.startsWith('✓')) checkedMap[i] = true;
+
+    // Nguồn 1: parse checklistStr từ Sheet (dạng "✓ task | ✗ task")
+    if (info && info.checklistStr) {
+      info.checklistStr.split(' | ').forEach((item, i) => {
+        checkedMap[i] = item.trim().startsWith('✓');
       });
     }
 
-    // Lấy từ localStorage nếu đang dùng thiết bị này
-    const code2 = document.getElementById('cl-code') ? document.getElementById('cl-code').value.trim() : '';
-    const name2 = document.getElementById('cl-name') ? document.getElementById('cl-name').value.trim() : '';
-    if (code2 === code && name2 === name) {
-      const todayDate = new Date().toISOString().slice(0,10);
-      if (todayDate === date) {
-        const prefix = `cl_${code}_${name}_d${d}_${date}`.replace(/\s+/g,'_');
-        const savedLocal = JSON.parse(localStorage.getItem(prefix)||'{}');
-        const tsLocal = JSON.parse(localStorage.getItem(prefix+'_ts')||'{}');
-        Object.assign(checkedMap, savedLocal);
-        Object.assign(timeMap, tsLocal);
+    // Nguồn 2: localStorage của thiết bị hiện tại (ưu tiên hơn vì có timestamp)
+    const allKeys = Object.keys(localStorage);
+    // Tìm key khớp với code + ngày + day (bất kể tên người dùng)
+    const pattern = `cl_${code.replace(/\s+/g,'_')}`;
+    allKeys.forEach(key => {
+      if (key.includes(pattern) && key.includes(`_d${d}_${date}`) && !key.endsWith('_ts') && !key.endsWith('_sent')) {
+        try {
+          const saved = JSON.parse(localStorage.getItem(key)||'{}');
+          const ts = JSON.parse(localStorage.getItem(key+'_ts')||'{}');
+          Object.assign(checkedMap, saved);
+          Object.assign(timeMap, ts);
+        } catch(e) {}
       }
-    }
+    });
 
     items.forEach((item, i) => {
-      const done = checkedMap[i];
+      const isDone = !!checkedMap[i];
       const t = timeMap[i] || '';
       html += `<div class="detail-task-row">
-        <div class="detail-check ${done?'done':'todo'}">${done?'✓':'○'}</div>
-        <div class="detail-task-name ${done?'done-text':''}">${item}</div>
-        ${done && t ? `<div class="detail-time">⏰ ${t}</div>` : ''}
+        <div class="detail-check ${isDone?'done':'todo'}">${isDone?'✓':'○'}</div>
+        <div class="detail-task-name ${isDone?'done-text':''}">${item}</div>
+        ${isDone ? `<div class="detail-time">${t ? '⏰ '+t : '✓'}</div>` : '<div class="detail-time" style="color:var(--border)">—</div>'}
       </div>`;
     });
     html += '</div>';
@@ -1933,6 +1944,216 @@ async function exportPDF() {
     showToast('Lỗi tạo PDF. Thử lại nha!','error');
     btn.textContent='⬇️ Tải PDF'; btn.disabled=false;
   }
+}
+
+// ── Xuất Bộ Kit PDF ──────────────────────────────────────────
+function exportKitPDF() {
+  const today = new Date().toLocaleDateString('vi-VN');
+  const old2 = document.getElementById('_kit_frame'); if(old2) old2.remove();
+  const iframe = document.createElement('iframe');
+  iframe.id = '_kit_frame';
+  iframe.style.cssText = 'position:fixed;top:-9999px;left:-9999px;width:900px;height:600px;border:0;';
+  document.body.appendChild(iframe);
+  const doc = iframe.contentDocument || iframe.contentWindow.document;
+  doc.open();
+  doc.write(`<!DOCTYPE html><html lang="vi"><head>
+    <meta charset="UTF-8">
+    <title>Bộ Kit Chuyển Đổi Ly 1L – Phúc Tea</title>
+    <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+      *{margin:0;padding:0;box-sizing:border-box;}
+      body{font-family:'Be Vietnam Pro',sans-serif;color:#1A1A2E;font-size:12px;line-height:1.7;}
+      /* TRANG BÌA */
+      .cover{min-height:100vh;background:linear-gradient(135deg,#1A1A2E 0%,#2C3E50 60%,#C0392B 100%);display:flex;flex-direction:column;justify-content:center;padding:60px;page-break-after:always;}
+      .cover-logo{height:70px;object-fit:contain;margin-bottom:24px;}
+      .cover-tag{display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.85);font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:16px;}
+      .cover-title{font-size:42px;font-weight:900;color:white;line-height:1.15;margin-bottom:8px;}
+      .cover-title span{color:#F5C518;}
+      .cover-sub{font-size:14px;color:rgba(255,255,255,0.65);margin-bottom:40px;}
+      .cover-divider{width:80px;height:3px;background:#C0392B;margin-bottom:32px;}
+      .cover-meta{color:rgba(255,255,255,0.5);font-size:11px;line-height:2;}
+      .cover-meta strong{color:rgba(255,255,255,0.85);}
+      .cover-notice{margin-top:32px;padding:16px 20px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:rgba(255,255,255,0.7);font-size:11px;line-height:1.8;}
+      .cover-notice strong{color:#F5C518;}
+      /* NỘI DUNG */
+      .page-break{page-break-before:always;}
+      .section{padding:32px 48px;}
+      .section-header{background:linear-gradient(90deg,#1A1A2E,#2C3E50);color:white;padding:14px 24px;margin:-32px -48px 24px;display:flex;align-items:center;gap:12px;}
+      .section-num{width:32px;height:32px;background:#C0392B;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;flex-shrink:0;}
+      .section-header h2{font-size:15px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}
+      h3{font-size:12px;font-weight:800;color:#C0392B;text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;border-left:3px solid #C0392B;padding-left:8px;}
+      table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11.5px;}
+      table th{background:#1A1A2E;color:white;padding:8px 12px;text-align:left;font-size:11px;}
+      table td{padding:7px 12px;border-bottom:1px solid #ECF0F1;vertical-align:top;}
+      table tr:nth-child(even) td{background:#F8F9FA;}
+      .goal-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px;}
+      .goal-card{border-radius:8px;padding:12px 14px;border-left:4px solid #C0392B;}
+      .goal-card.blue{border-left-color:#2471A3;background:#EBF5FB;}
+      .goal-card.red{border-left-color:#C0392B;background:#FDEDEC;}
+      .goal-card.green{border-left-color:#27AE60;background:#EAFAF1;}
+      .goal-card.orange{border-left-color:#CA6F1E;background:#FEF9E7;}
+      .goal-card h4{font-size:11.5px;font-weight:700;margin-bottom:4px;}
+      .goal-card p{font-size:11px;color:#7F8C8D;}
+      .tip-block{background:#F8F9FA;border-radius:8px;padding:12px 14px;margin-bottom:10px;}
+      .tip-block .wrong{color:#C0392B;font-size:11px;margin-bottom:6px;}
+      .tip-block .right{color:#27AE60;font-size:11px;font-weight:600;}
+      .tip-block .why{color:#95A5A6;font-size:10.5px;font-style:italic;margin-top:3px;}
+      .tip-label{font-size:9.5px;font-weight:800;text-transform:uppercase;letter-spacing:.8px;margin-bottom:3px;}
+      .tip-label.x{color:#C0392B;} .tip-label.ok{color:#27AE60;}
+      .bubble-wrap{display:flex;flex-direction:column;gap:8px;margin-bottom:12px;}
+      .bubble{max-width:82%;padding:8px 12px;border-radius:10px;font-size:11.5px;line-height:1.6;}
+      .bubble .who{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}
+      .bubble.kh{background:#ECF0F1;border-radius:10px 10px 10px 2px;align-self:flex-start;}
+      .bubble.kh .who{color:#95A5A6;}
+      .bubble.nv{background:#C0392B;color:white;border-radius:10px 10px 2px 10px;align-self:flex-end;}
+      .bubble.nv .who{color:rgba(255,255,255,0.7);}
+      .principle{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #ECF0F1;}
+      .p-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:white;flex-shrink:0;}
+      .p-num.r{background:#C0392B;} .p-num.b{background:#2471A3;} .p-num.g{background:#27AE60;} .p-num.o{background:#CA6F1E;}
+      .faq-q{font-size:11.5px;font-weight:700;color:#1A1A2E;margin-bottom:4px;}
+      .faq-a{font-size:11px;color:#5D6D7E;padding-left:12px;border-left:2px solid #27AE60;}
+      .footer-bar{text-align:center;font-size:9.5px;color:#95A5A6;padding:12px;border-top:1px solid #ECF0F1;margin-top:24px;}
+      @media print{
+        .cover{min-height:auto;padding:40px;}
+        body{font-size:11px;}
+        @page{margin:15mm;}
+      }
+    </style>
+  </head><body>
+
+  <!-- TRANG BÌA -->
+  <div class="cover">
+    <img class="cover-logo" src="logongang.png" onerror="this.style.display='none'">
+    <div class="cover-tag">Hệ thống trà sữa Phúc Tea</div>
+    <div class="cover-title">Bộ Kit Chuyển Đổi<br><span>Ly 1L</span></div>
+    <div class="cover-sub">Tài liệu hướng dẫn vận hành · Chiến lược upsell & thu thập dữ liệu khách hàng</div>
+    <div class="cover-divider"></div>
+    <div class="cover-meta">
+      <strong>Phát hành bởi:</strong> Bộ phận Vận hành – Phúc Tea<br>
+      <strong>Áp dụng từ:</strong> Quý 2 – 2026<br>
+      <strong>Phiên bản:</strong> 1.0<br>
+      <strong>Ngày xuất:</strong> ${today}
+    </div>
+    <div class="cover-notice">
+      <strong>⚠️ Lưu hành nội bộ – Không phát tán ra ngoài</strong><br>
+      Tài liệu này được soạn thảo bởi Bộ phận Vận hành Phúc Tea, dành riêng cho nhân sự và đối tác nhượng quyền trong hệ thống. Nghiêm cấm sao chép, chia sẻ hoặc phát tán dưới mọi hình thức khi chưa được sự đồng ý bằng văn bản của Ban Giám đốc Phúc Tea. Vi phạm sẽ được xử lý theo quy định hợp đồng nhượng quyền.
+    </div>
+  </div>
+
+  <!-- PHẦN 1: BỘ KIT -->
+  <div class="section page-break">
+    <div class="section-header"><div class="section-num">1</div><h2>Bộ Kit Chuyển Đổi</h2></div>
+
+    <h3>Mục tiêu chiến lược</h3>
+    <div class="goal-grid">
+      <div class="goal-card red"><h4>📈 Tăng 30% số lượng bán</h4><p>Thay Xô 1L bằng Ly 1L · Chỉ +2K thay vì +5–9K · Khách dễ đồng ý hơn</p></div>
+      <div class="goal-card blue"><h4>📱 Thu thập dữ liệu khách hàng</h4><p>Khách để SĐT đổi giá bằng Size M · Tích điểm + CSKH</p></div>
+      <div class="goal-card green"><h4>💰 Giảm COGS & dòng tiền</h4><p>Topping giữ nguyên Size M · Chỉ tăng lượng nước</p></div>
+      <div class="goal-card orange"><h4>🏆 Tăng khả năng cạnh tranh</h4><p>Giá trị đồ uống vượt đối thủ trong khi giữ định giá</p></div>
+    </div>
+
+    <h3>So sánh sản phẩm</h3>
+    <table>
+      <thead><tr><th>Tiêu chí</th><th>Size M</th><th>Xô 1L (cũ)</th><th>Ly 1L (mới)</th></tr></thead>
+      <tbody>
+        <tr><td>Lượng nước</td><td>600ml</td><td>1.000ml</td><td><strong>1.000ml ✓</strong></td></tr>
+        <tr><td>Topping</td><td>Tiêu chuẩn M</td><td>Nhiều hơn</td><td><strong>Tiêu chuẩn M ✓</strong></td></tr>
+        <tr><td>Giá niêm yết</td><td>Giá M</td><td>Giá M + 5–9K</td><td><strong>Giá M (có SĐT) / +2K ✓</strong></td></tr>
+        <tr><td>COGS</td><td>Chuẩn</td><td>Cao</td><td><strong>Trung bình ✓</strong></td></tr>
+      </tbody>
+    </table>
+    <p style="font-size:10.5px;color:#95A5A6;font-style:italic">* Để lại SĐT → giá bằng Size M + tích điểm · Không để SĐT → giá Size M + 2K</p>
+
+    <h3>Vật tư cần chuẩn bị</h3>
+    <table>
+      <thead><tr><th>#</th><th>Vật tư</th><th>Mô tả</th><th>Ghi chú</th></tr></thead>
+      <tbody>
+        <tr><td>1</td><td>Ly nhựa PP 900ml</td><td>Ly dùng cho Ly 1L</td><td>Kiểm tra quy cách</td></tr>
+        <tr><td>2</td><td>Màng ép ly 1L</td><td>Nắp bao kín</td><td>Khác máy ép ly 600ml</td></tr>
+        <tr><td>3</td><td>Bịch đựng 01 ly 1L</td><td>Túi giữ ly không đổ</td><td>Kiểm tra vừa khớp</td></tr>
+        <tr><td>4</td><td><strong>Máy ép màng ly 1L</strong></td><td>Máy nén nắp màng</td><td><strong style="color:#C0392B">⚠️ Khác máy ly 600ml – mua riêng</strong></td></tr>
+        <tr><td>5</td><td>Menu bổ sung</td><td>Cập nhật size + giá</td><td>Hệ thống cung cấp mẫu</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- PHẦN 2: MẸO TƯ VẤN -->
+  <div class="section page-break">
+    <div class="section-header"><div class="section-num">2</div><h2>Mẹo Tư Vấn</h2></div>
+
+    <p style="font-size:12px;color:#5D6D7E;margin-bottom:16px">Không cho khách chọn có/không · Đặt mặc định Ly 1L · Giới thiệu 2 phương án giá · Thuyết phục tối thiểu 2 lần</p>
+
+    ${[
+      ['Đề xuất Ly 1L – đặt mặc định','❌ "Anh/chị có muốn lấy Ly 1L không?"','✅ "Để mình lấy Ly 1L luôn nha — uống no hơn mà giá hơn có 2K hà!"','Đặt mặc định là đã chọn Ly 1L – khách muốn đổi mới phải nói'],
+      ['Giới thiệu 2 phương án giá','❌ "Anh/chị có muốn để lại số không?"','✅ "Ly 1L có 2 giá nha – để lại số thì bằng Size M + tích điểm, không để số thì +2K thôi. Anh/chị chọn sao?"','Khách tự so sánh và thấy để số là lợi hơn'],
+      ['Khi khách do dự','❌ "Thôi được rồi, mình làm Size M."','✅ "Uống Ly 1L no lắm á anh/chị ơi – 1.000ml, uống cả buổi luôn, hơn 2K mà khác biệt nhiều lắm, thử một lần coi!"','Kiên trì lần 2 – nhấn cảm giác no lâu'],
+      ['Khi khách lo bị spam','❌ "Không sao đâu ạ, không spam đâu." (rồi thôi)','✅ "Số bên mình dùng để tích điểm, gửi voucher với hỏi thăm sau mua thôi – giữ bảo mật, không bán hay chia cho ai hết á!"','Nói rõ mục đích + cam kết bảo mật cụ thể'],
+      ['Nói về dung tích','❌ "Ly này 1.000ml trà sữa nha anh/chị."','✅ "Ly 1L tổng 1.000ml – uống no hơn gấp rưỡi Size M, mang đi uống cả buổi luôn đó!"','Tránh gây hiểu nhầm – nhấn cảm giác no lâu thay vì số liệu'],
+    ].map(([title, wrong, right, why]) => `
+      <div class="tip-block">
+        <div style="font-size:11px;font-weight:800;color:#2C3E50;margin-bottom:8px">${title}</div>
+        <div class="tip-label x">❌ Không nên nói</div>
+        <div class="wrong">${wrong}</div>
+        <div class="tip-label ok" style="margin-top:6px">✅ Nên nói vầy nè</div>
+        <div class="right">${right}</div>
+        <div class="why">${why}</div>
+      </div>`).join('')}
+  </div>
+
+  <!-- PHẦN 3: KỊCH BẢN -->
+  <div class="section page-break">
+    <div class="section-header"><div class="section-num">3</div><h2>Kịch Bản Tư Vấn</h2></div>
+
+    <div style="background:#1A1A2E;border-radius:8px;padding:12px 16px;margin-bottom:16px">
+      <div style="font-size:10px;font-weight:800;color:#F5C518;text-transform:uppercase;letter-spacing:1px;margin-bottom:6px">⚡ 2 chương trình song song</div>
+      <div style="color:rgba(255,255,255,0.85);font-size:11.5px;line-height:1.8">
+        🟢 <strong style="color:#2ECC71">Để lại SĐT</strong> → Ly 1L giá bằng Size M + tích điểm + nhận voucher<br>
+        🟡 <strong style="color:#F5C518">Không để SĐT</strong> → Ly 1L giá Size M + 2K (vẫn upsell – không ép)
+      </div>
+    </div>
+
+    <h3>4 Nguyên Tắc Cốt Lõi</h3>
+    <div class="principle"><div class="p-num r">1</div><div><strong>Nói khẳng định, không hỏi</strong> — "Dùng Ly 1L luôn nha" thay vì "Có muốn dùng Ly 1L không?"</div></div>
+    <div class="principle"><div class="p-num b">2</div><div><strong>Thuyết phục tối thiểu 2 lần</strong> — Lần 1 đề xuất → khách do dự → lần 2 nhấn lợi ích → từ chối rõ mới thôi</div></div>
+    <div class="principle"><div class="p-num g">3</div><div><strong>Giới thiệu 2 giá – khách tự chọn</strong> — Để số thì bằng Size M, không để thì +2K. Khách tự so sánh</div></div>
+    <div class="principle"><div class="p-num o">4</div><div><strong>Nhấn cảm giác, không số liệu</strong> — "Uống no cả buổi" thay vì "thêm 400ml"</div></div>
+
+    <h3>Tình Huống 1 – KH Order Size M → Chọn Để SĐT</h3>
+    <div class="bubble-wrap">
+      <div class="bubble kh"><div class="who">Khách</div>Cho mình một ly trà sữa trân châu đen, size M nha.</div>
+      <div class="bubble nv"><div class="who">Nhân viên</div>Dạ bên mình đang có Ly 1L – uống no hơn gấp rưỡi Size M, 1.000ml tổng luôn! Có 2 giá nha: để lại số → bằng giá Size M + tích điểm · không để số → cộng thêm 2K thôi. Anh/chị chọn sao nha?</div>
+      <div class="bubble kh"><div class="who">Khách</div>Để lại số được, 09xxxxxxxx nha.</div>
+      <div class="bubble nv"><div class="who">Nhân viên ✓</div>Dạ cảm ơn anh/chị! Ly 1L trân châu đen – giá Size M luôn! Mình ghi số rồi, sau có voucher nhắn qua cho nha!</div>
+    </div>
+
+    <h3>Tình Huống 2 – KH Do Dự → Thuyết Phục Lần 2</h3>
+    <div class="bubble-wrap">
+      <div class="bubble nv"><div class="who">Nhân viên</div>Dạ Ly 1L có 2 giá nha – để số thì bằng Size M, không để thì +2K thôi. Anh/chị chọn sao?</div>
+      <div class="bubble kh"><div class="who">Khách</div>Ừm… thôi size M đi.</div>
+      <div class="bubble nv"><div class="who">Nhân viên – lần 2</div>Dạ Ly 1L uống no lắm á anh/chị ơi – 1.000ml, mang đi uống cả buổi luôn, chọn giá nào cũng hời hơn Size M nhiều lắm, thử một lần coi!</div>
+      <div class="bubble kh"><div class="who">Khách</div>Ừ thôi lấy Ly 1L, +2K đi.</div>
+      <div class="bubble nv"><div class="who">Nhân viên ✓</div>Dạ được nha! Ly 1L làm liền cho anh/chị!</div>
+    </div>
+
+    <h3>Câu Hỏi Thường Gặp (FAQ)</h3>
+    ${[
+      ['Sao mất tích Xô 1L rồi vậy?','Bên mình nâng cấp lên Ly 1L rồi đó – vẫn 1.000ml, tiện hơn, đẹp hơn, mà giá hơn Size M có 2K hà!'],
+      ['Topping ít hơn không?','Topping y chang Size M hà – chỉ nhiều nước hơn thôi, uống no lắm đó!'],
+      ['Để số có bị spam không?','Số bên mình dùng để tích điểm, gửi voucher với hỏi thăm sau mua thôi – giữ bảo mật, không bán hay chia cho ai hết nha!'],
+      ['+2K có đáng không?','Đáng lắm! 2K mà được thêm 400ml, uống được cả buổi luôn – gần như gấp rưỡi Size M đó!'],
+    ].map(([q,a]) => `<div style="margin-bottom:10px"><div class="faq-q">Q: ${q}</div><div class="faq-a">${a}</div></div>`).join('')}
+
+    <div class="footer-bar">
+      Phúc Tea · Hệ thống trà sữa nhượng quyền · Phát hành bởi Bộ phận Vận hành · Lưu hành nội bộ · ${today}
+    </div>
+  </div>
+
+  </body></html>`);
+  doc.close();
+  setTimeout(() => {
+    try { iframe.contentWindow.print(); }
+    catch(e) { alert('Trình duyệt chặn in. Vui lòng cho phép popup và thử lại.'); }
+  }, 800);
 }
 
 function parseCSV(text) {
