@@ -934,7 +934,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
         <div class="step-title">Thông tin cửa hàng & đào tạo</div>
         <div class="bienban-form-grid">
           <div class="form-group"><label>Mã cửa hàng *</label><input type="text" id="bb-code" placeholder="VD: PHUCTEA165 - LÊ LỢI ST"></div>
-          <div class="form-group"><label>Ngày đào tạo *</label><input type="date" id="bb-date"></div>
+          <div class="form-group"><label>Ngày lập biên bản *</label><input type="date" id="bb-date"></div>
           <div class="form-group"><label>Họ tên đội setup *</label><input type="text" id="bb-setup-name" placeholder="Người thực hiện"></div>
           <div class="form-group"><label>Chủ / Quản lý cửa hàng *</label><input type="text" id="bb-owner" placeholder="Họ tên chủ/QL"></div>
         </div>
@@ -1707,7 +1707,7 @@ function renderBBPreview() {
       <div class="bb-section-title">Thông tin chung</div>
       <table>
         <tr><td style="width:140px;font-weight:600">Cửa hàng</td><td>${code}</td></tr>
-        <tr><td style="font-weight:600">Ngày đào tạo</td><td>${dateStr}</td></tr>
+        <tr><td style="font-weight:600">Ngày lập biên bản</td><td>${dateStr}</td></tr>
         <tr><td style="font-weight:600">Đội setup</td><td>${setup}</td></tr>
         <tr><td style="font-weight:600">Chủ / Quản lý CH</td><td>${owner}</td></tr>
         <tr><td style="font-weight:600">Số nhân viên</td><td>${nvList.length} người</td></tr>
@@ -2004,7 +2004,7 @@ function rebuildBBHtml(bb) {
       <div class="bb-section-title">Thông tin chung</div>
       <table>
         <tr><td style="width:140px;font-weight:600">Cửa hàng</td><td>${bb.code||''}</td></tr>
-        <tr><td style="font-weight:600">Ngày đào tạo</td><td>${dateStr}</td></tr>
+        <tr><td style="font-weight:600">Ngày lập biên bản</td><td>${dateStr}</td></tr>
         <tr><td style="font-weight:600">Đội setup</td><td>${bb.setup||''}</td></tr>
         <tr><td style="font-weight:600">Chủ / Quản lý CH</td><td>${bb.owner||''}</td></tr>
         <tr><td style="font-weight:600">Số nhân viên</td><td>${nvList.length} người</td></tr>
@@ -2232,8 +2232,8 @@ function exportKitPDF() {
       @media print{
         .cover{min-height:auto;padding:40px;}
         body{font-size:11px;}
-        @page{margin:15mm;}
       }
+      @page{margin:10mm;size:A4;}
     </style>
   </head><body>
 
