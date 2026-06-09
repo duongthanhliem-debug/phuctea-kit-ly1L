@@ -854,7 +854,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
   </div>
   <div class="stat-cards">
     <div class="stat-card"><div class="stat-label">Cửa hàng đã báo cáo</div><div class="stat-value" id="s-stores">—</div></div>
-    <div class="stat-card blue"><div class="stat-label">Tổng đơn Ly 1L</div><div class="stat-value" id="s-total-ly1l">—</div></div>
+    <div class="stat-card blue"><div class="stat-label">Tỷ lệ bán Ly 1L TB</div><div class="stat-value" id="s-total-ly1l">—</div></div>
     <div class="stat-card green"><div class="stat-label">Tỷ lệ upsell TB</div><div class="stat-value" id="s-avg-rate">—</div><div class="stat-unit">%</div></div>
     <div class="stat-card orange"><div class="stat-label">Tích điểm TB</div><div class="stat-value" id="s-total-sdt">—</div></div>
   </div>
@@ -1260,7 +1260,11 @@ async function loadChecklist() {
     rows.forEach(r => {
       const key = `${r[1]}__${r[3]}`; // mã CH + ngày
       if (!map[key]) map[key] = { code: r[1], name: r[2], date: r[3], days: {} };
-      map[key].days[r[4]] = { done: +r[5]||0, total: +r[6]||0 };
+      map[key].days[r[4]] = {
+        done: +r[5]||0,
+        total: +r[6]||0,
+        checklistStr: r[7]||''  // cột H = chi tiết từng task
+      };
     });
 
     const cards = Object.values(map);
@@ -1964,22 +1968,26 @@ function exportKitPDF() {
       *{margin:0;padding:0;box-sizing:border-box;}
       body{font-family:'Be Vietnam Pro',sans-serif;color:#1A1A2E;font-size:12px;line-height:1.7;}
       /* TRANG BÌA */
-      .cover{min-height:100vh;background:linear-gradient(135deg,#1A1A2E 0%,#2C3E50 60%,#C0392B 100%);display:flex;flex-direction:column;justify-content:center;padding:60px;page-break-after:always;}
-      .cover-logo{height:70px;object-fit:contain;margin-bottom:24px;}
-      .cover-tag{display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:rgba(255,255,255,0.85);font-size:11px;font-weight:700;padding:4px 14px;border-radius:20px;letter-spacing:1.5px;text-transform:uppercase;margin-bottom:16px;}
-      .cover-title{font-size:42px;font-weight:900;color:white;line-height:1.15;margin-bottom:8px;}
+      .cover{min-height:100vh;background:linear-gradient(150deg,#1A1A2E 0%,#2C3E50 50%,#922B21 100%);display:flex;flex-direction:column;justify-content:center;padding:60px;page-break-after:always;position:relative;overflow:hidden;}
+      .cover::before{content:'';position:absolute;top:-100px;right:-100px;width:400px;height:400px;border-radius:50%;background:rgba(192,57,43,0.15);}
+      .cover::after{content:'';position:absolute;bottom:-80px;left:-80px;width:300px;height:300px;border-radius:50%;background:rgba(245,197,24,0.08);}
+      .cover-logo{height:64px;object-fit:contain;margin-bottom:28px;}
+      .cover-tag{display:inline-block;background:rgba(245,197,24,0.2);border:1px solid rgba(245,197,24,0.5);color:#F5C518;font-size:10px;font-weight:800;padding:5px 16px;border-radius:20px;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;}
+      .cover-title{font-size:46px;font-weight:900;color:white;line-height:1.1;margin-bottom:10px;}
       .cover-title span{color:#F5C518;}
-      .cover-sub{font-size:14px;color:rgba(255,255,255,0.65);margin-bottom:40px;}
-      .cover-divider{width:80px;height:3px;background:#C0392B;margin-bottom:32px;}
-      .cover-meta{color:rgba(255,255,255,0.5);font-size:11px;line-height:2;}
-      .cover-meta strong{color:rgba(255,255,255,0.85);}
-      .cover-notice{margin-top:32px;padding:16px 20px;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.15);border-radius:10px;color:rgba(255,255,255,0.7);font-size:11px;line-height:1.8;}
+      .cover-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:48px;max-width:480px;}
+      .cover-divider{width:60px;height:4px;background:linear-gradient(90deg,#C0392B,#F5C518);border-radius:2px;margin-bottom:36px;}
+      .cover-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:32px;}
+      .cover-info-item{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:12px 16px;}
+      .cover-info-label{font-size:9px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;}
+      .cover-info-value{font-size:12px;font-weight:700;color:rgba(255,255,255,0.9);}
+      .cover-notice{padding:14px 18px;background:rgba(245,197,24,0.1);border:1px solid rgba(245,197,24,0.3);border-left:4px solid #F5C518;border-radius:0 10px 10px 0;color:rgba(255,255,255,0.75);font-size:11px;line-height:1.8;}
       .cover-notice strong{color:#F5C518;}
       /* NỘI DUNG */
       .page-break{page-break-before:always;}
       .section{padding:32px 48px;}
-      .section-header{background:linear-gradient(90deg,#1A1A2E,#2C3E50);color:white;padding:14px 24px;margin:-32px -48px 24px;display:flex;align-items:center;gap:12px;}
-      .section-num{width:32px;height:32px;background:#C0392B;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:900;flex-shrink:0;}
+      .section-header{background:linear-gradient(90deg,#1A1A2E 0%,#2C3E50 100%);color:white;padding:16px 24px;margin:-32px -48px 24px;display:flex;align-items:center;gap:14px;border-bottom:3px solid #C0392B;}
+      .section-num{width:36px;height:36px;background:linear-gradient(135deg,#C0392B,#922B21);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:900;flex-shrink:0;box-shadow:0 2px 8px rgba(192,57,43,0.4);}
       .section-header h2{font-size:15px;font-weight:800;letter-spacing:.5px;text-transform:uppercase;}
       h3{font-size:12px;font-weight:800;color:#C0392B;text-transform:uppercase;letter-spacing:.5px;margin:18px 0 8px;border-left:3px solid #C0392B;padding-left:8px;}
       table{width:100%;border-collapse:collapse;margin-bottom:14px;font-size:11.5px;}
@@ -1992,8 +2000,8 @@ function exportKitPDF() {
       .goal-card.red{border-left-color:#C0392B;background:#FDEDEC;}
       .goal-card.green{border-left-color:#27AE60;background:#EAFAF1;}
       .goal-card.orange{border-left-color:#CA6F1E;background:#FEF9E7;}
-      .goal-card h4{font-size:11.5px;font-weight:700;margin-bottom:4px;}
-      .goal-card p{font-size:11px;color:#7F8C8D;}
+      .goal-card h4{font-size:12px;font-weight:800;margin-bottom:4px;color:#1A1A2E;}
+      .goal-card p{font-size:11px;color:#5D6D7E;}
       .tip-block{background:#F8F9FA;border-radius:8px;padding:12px 14px;margin-bottom:10px;}
       .tip-block .wrong{color:#C0392B;font-size:11px;margin-bottom:6px;}
       .tip-block .right{color:#27AE60;font-size:11px;font-weight:600;}
@@ -2005,8 +2013,9 @@ function exportKitPDF() {
       .bubble .who{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px;}
       .bubble.kh{background:#ECF0F1;border-radius:10px 10px 10px 2px;align-self:flex-start;}
       .bubble.kh .who{color:#95A5A6;}
-      .bubble.nv{background:#C0392B;color:white;border-radius:10px 10px 2px 10px;align-self:flex-end;}
+      .bubble.nv{background:linear-gradient(135deg,#C0392B,#922B21);color:white;border-radius:10px 10px 2px 10px;align-self:flex-end;box-shadow:0 2px 8px rgba(192,57,43,0.3);}
       .bubble.nv .who{color:rgba(255,255,255,0.7);}
+      .bubble.kh{background:#ECF0F1;border-radius:10px 10px 10px 2px;align-self:flex-start;box-shadow:0 1px 4px rgba(0,0,0,0.08);}
       .principle{display:flex;gap:10px;padding:8px 0;border-bottom:1px solid #ECF0F1;}
       .p-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;color:white;flex-shrink:0;}
       .p-num.r{background:#C0392B;} .p-num.b{background:#2471A3;} .p-num.g{background:#27AE60;} .p-num.o{background:#CA6F1E;}
@@ -2028,11 +2037,13 @@ function exportKitPDF() {
     <div class="cover-title">Bộ Kit Chuyển Đổi<br><span>Ly 1L</span></div>
     <div class="cover-sub">Tài liệu hướng dẫn vận hành · Chiến lược upsell & thu thập dữ liệu khách hàng</div>
     <div class="cover-divider"></div>
-    <div class="cover-meta">
-      <strong>Phát hành bởi:</strong> Bộ phận Vận hành – Phúc Tea<br>
-      <strong>Áp dụng từ:</strong> Quý 2 – 2026<br>
-      <strong>Phiên bản:</strong> 1.0<br>
-      <strong>Ngày xuất:</strong> ${today}
+    <div class="cover-info-grid">
+      <div class="cover-info-item"><div class="cover-info-label">Phát hành bởi</div><div class="cover-info-value">Bộ phận Vận hành · Phúc Tea</div></div>
+      <div class="cover-info-item"><div class="cover-info-label">Áp dụng từ</div><div class="cover-info-value">Quý 2 – 2026</div></div>
+      <div class="cover-info-item"><div class="cover-info-label">Phiên bản</div><div class="cover-info-value">1.0</div></div>
+      <div class="cover-info-item"><div class="cover-info-label">Ngày xuất</div><div class="cover-info-value">${today}</div></div>
+      <div class="cover-info-item"><div class="cover-info-label">Đối tượng áp dụng</div><div class="cover-info-value">Nhân sự & Đối tác nhượng quyền</div></div>
+      <div class="cover-info-item"><div class="cover-info-label">Phạm vi</div><div class="cover-info-value">Toàn hệ thống Phúc Tea</div></div>
     </div>
     <div class="cover-notice">
       <strong>⚠️ Lưu hành nội bộ – Không phát tán ra ngoài</strong><br>
