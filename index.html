@@ -1006,7 +1006,7 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
 </div>
 
 <script>
-const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwUWdsQNKiE1dTD95oKHK-bL8hNEK851pTQrE-IQ-8ZK2TvCHSOoYJ57nocMXEZ8cEmeg/exec";
+const APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx7dGaqmlwYk_Mi5NLKTxpIxkB-gVZjyExkREBHQWRP6kbJNOI6S_a_pH0oIFpjMgHM_Q/exec";
 const SHEET_ID        = "1qCXKM-1raCAwuTJ12u-J--7iei9JrllRggmM6EclgIE";
 const SHEET_GID       = "1222571622"; // tab KPI_LY1L
 
@@ -1754,31 +1754,56 @@ function renderBBPreview() {
 }
 
 // ── Lưu biên bản lên Google Sheets ──────────────────────────
+// Nén ảnh về 400px / quality 0.4 để vừa với Google Sheets cell
+function compressPhoto(dataUrl) {
+  return new Promise(resolve => {
+    if (!dataUrl || !dataUrl.startsWith('data:image')) { resolve(dataUrl); return; }
+    const img = new Image();
+    img.onload = () => {
+      const MAX = 400;
+      const scale = Math.min(1, MAX / Math.max(img.width, img.height));
+      const canvas = document.createElement('canvas');
+      canvas.width = Math.round(img.width * scale);
+      canvas.height = Math.round(img.height * scale);
+      canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+      resolve(canvas.toDataURL('image/jpeg', 0.4));
+    };
+    img.onerror = () => resolve(dataUrl);
+    img.src = dataUrl;
+  });
+}
+
 async function saveBienBan(bbData) {
-  if (APPS_SCRIPT_URL === "PASTE_YOUR_APPS_SCRIPT_URL_HERE") {
-    // Demo: lưu localStorage
-    const saved = JSON.parse(localStorage.getItem('bienban_list') || '[]');
-    saved.unshift(bbData);
-    localStorage.setItem('bienban_list', JSON.stringify(saved.slice(0,50)));
-    return true;
-  }
+  // Luôn lưu local trước
+  const saved = JSON.parse(localStorage.getItem('bienban_list') || '[]');
+  saved.unshift(bbData);
+  localStorage.setItem('bienban_list', JSON.stringify(saved.slice(0,30)));
+
+  if (APPS_SCRIPT_URL === "PASTE_YOUR_APPS_SCRIPT_URL_HERE") return true;
+
+  // Gửi lên Sheet — tách thành chunks nếu cần
   try {
+    const payload = {
+      type: "bienban",
+      code: bbData.code,
+      date: bbData.date,
+      setup: bbData.setup,
+      owner: bbData.owner,
+      nvList: JSON.stringify(bbData.nvList || []),
+      nvCount: bbData.nvCount,
+      sigSetup: bbData.sigSetup || '',
+      sigOwner: bbData.sigOwner || '',
+      nvSigs: JSON.stringify(bbData.nvSigs || []),
+      photo: bbData.photo || '',
+      savedAt: bbData.savedAt,
+    };
     await fetch(APPS_SCRIPT_URL, {
       method: "POST", mode: "no-cors",
       headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({type: "bienban", ...bbData})
+      body: JSON.stringify(payload)
     });
-    // Cũng lưu local để xem offline
-    const saved = JSON.parse(localStorage.getItem('bienban_list') || '[]');
-    saved.unshift(bbData);
-    localStorage.setItem('bienban_list', JSON.stringify(saved.slice(0,50)));
-    return true;
-  } catch(e) {
-    const saved = JSON.parse(localStorage.getItem('bienban_list') || '[]');
-    saved.unshift(bbData);
-    localStorage.setItem('bienban_list', JSON.stringify(saved.slice(0,50)));
-    return true;
-  }
+  } catch(e) { /* no-cors: ignore */ }
+  return true;
 }
 
 // ── Load danh sách biên bản ───────────────────────────────────
@@ -1787,41 +1812,56 @@ async function loadBienBanList() {
   if (!body) return;
   body.innerHTML = '<div class="bb-empty">⏳ Đang tải...</div>';
 
-  // Load từ Google Sheets BIEN_BAN
+  // Load từ Google Sheets BIEN_BAN — đọc cột đầy đủ
   let sheetRows = [];
   if (SHEET_ID && SHEET_ID !== "PASTE_YOUR_SHEET_ID_HERE") {
     try {
       const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=BIEN_BAN`;
       const text = await (await fetch(url)).text();
-      sheetRows = parseCSV(text).slice(1).filter(r => r[1]); // bỏ header, lọc có mã CH
+      sheetRows = parseCSV(text).slice(1).filter(r => r[1]);
     } catch(e) {}
   }
 
-  // Merge: Sheet rows + localStorage (ưu tiên localStorage vì có htmlContent)
+  // Local saved
   const localSaved = JSON.parse(localStorage.getItem('bienban_list') || '[]');
-  const localValid = localSaved.filter(bb => bb.htmlContent && bb.code && bb.code.length > 1);
+  const localValid = localSaved.filter(bb => bb.code && bb.code.length > 1);
 
-  // Tạo list hiển thị: Sheet rows + local (tránh trùng theo code+date)
+  // Build display list — ưu tiên local (có htmlContent), Sheet làm fallback
   const displayList = [];
+  const seen = new Set();
 
-  // Thêm từ Sheet trước
-  sheetRows.forEach(r => {
-    const code = r[1], date = r[2], setup = r[3], nvCount = r[4];
-    if (!code) return;
-    // Kiểm tra có bản local không
-    const localMatch = localValid.find(b => b.code === code && b.date === date);
-    displayList.push({
-      code, date, setup, nvCount,
-      savedAt: r[0],
-      htmlContent: localMatch ? localMatch.htmlContent : null,
-      source: localMatch ? 'local' : 'sheet'
-    });
+  // Local trước (đầy đủ nhất)
+  localValid.forEach(bb => {
+    const key = `${bb.code}__${bb.date}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    displayList.push({...bb, source: 'local'});
   });
 
-  // Thêm local không có trong Sheet
-  localValid.forEach(bb => {
-    const already = displayList.find(d => d.code === bb.code && d.date === bb.date);
-    if (!already) displayList.push({...bb, source: 'local'});
+  // Sheet — chỉ thêm nếu chưa có trong local, nhưng rebuild htmlContent từ data Sheet
+  sheetRows.forEach(r => {
+    // Cols: A=savedAt, B=code, C=date, D=setup, E=owner, F=nvList, G=nvCount,
+    //       H=sigSetup, I=sigOwner, J=nvSigs, K=photo
+    const code = r[1], date = r[2];
+    if (!code) return;
+    const key = `${code}__${date}`;
+    if (seen.has(key)) return; // đã có local
+    seen.add(key);
+    // Rebuild bbData từ Sheet columns
+    const bbFromSheet = {
+      savedAt: r[0], code, date,
+      setup: r[3], owner: r[4],
+      nvList: (() => { try { return JSON.parse(r[5]||'[]'); } catch(e) { return []; } })(),
+      nvCount: r[6],
+      sigSetup: r[7] || '',
+      sigOwner: r[8] || '',
+      nvSigs: (() => { try { return JSON.parse(r[9]||'[]'); } catch(e) { return []; } })(),
+      photo: r[10] || '',
+      source: 'sheet'
+    };
+    // Rebuild htmlContent từ data
+    bbFromSheet.htmlContent = rebuildBBHtml(bbFromSheet);
+    displayList.push(bbFromSheet);
   });
 
   if (!displayList.length) {
@@ -1894,6 +1934,65 @@ function exportSavedPDF(idx) {
   printBBHtml(bb.htmlContent || '', bb.code || 'bienban', bb.date || '');
 }
 
+// Rebuild biên bản HTML từ data lưu trong Sheet
+function rebuildBBHtml(bb) {
+  const dateStr = bb.date ? new Date(bb.date).toLocaleDateString('vi-VN') : '';
+  const nvList = Array.isArray(bb.nvList) ? bb.nvList : [];
+  const nvSigs = Array.isArray(bb.nvSigs) ? bb.nvSigs : [];
+
+  const noidung = [
+    'Quy trình pha chế Ly 1L và tiêu chuẩn sản phẩm (SOP pha chế)',
+    'Kịch bản tư vấn upsell Ly 1L — 2 phương án giá (để SĐT / +2K)',
+    'Cách xin SĐT, giới thiệu tích điểm và cam kết bảo mật thông tin',
+    'Xử lý tình huống từ chối, khách hỏi Xô 1L cũ, khách vội',
+    'Vận hành máy ép màng Ly 1L — phân biệt với máy ly 600ml',
+    'Tiêu chuẩn kiểm tra chất lượng Ly 1L trước khi giao khách',
+    'Xác nhận đã nhận đủ tài liệu: SOP bản cứng, tài liệu, kịch bản tư vấn, máy ép đã được hướng dẫn sử dụng',
+  ];
+
+  const nvRows = nvList.map((nv, i) => {
+    const sig = nvSigs[i] || '';
+    return `<tr><td>${i+1}</td><td>${nv}</td><td style="text-align:center">${sig ? `<img src="${sig}" style="height:36px;object-fit:contain">` : ''}</td></tr>`;
+  }).join('');
+
+  return `
+    <div class="bb-header">
+      <div class="bb-logo-row">
+        <img class="bb-logo" src="logongang.png" style="height:44px;object-fit:contain" onerror="this.style.display='none'">
+      </div>
+      <div class="bb-title">Biên Bản Xác Nhận Đào Tạo</div>
+      <div class="bb-subtitle">Chương trình chuyển đổi Ly 1L · ${dateStr}</div>
+    </div>
+    <div class="bb-section">
+      <div class="bb-section-title">Thông tin chung</div>
+      <table>
+        <tr><td style="width:140px;font-weight:600">Cửa hàng</td><td>${bb.code||''}</td></tr>
+        <tr><td style="font-weight:600">Ngày đào tạo</td><td>${dateStr}</td></tr>
+        <tr><td style="font-weight:600">Đội setup</td><td>${bb.setup||''}</td></tr>
+        <tr><td style="font-weight:600">Chủ / Quản lý CH</td><td>${bb.owner||''}</td></tr>
+        <tr><td style="font-weight:600">Số nhân viên</td><td>${nvList.length} người</td></tr>
+      </table>
+    </div>
+    <div class="bb-section">
+      <div class="bb-section-title">Nội dung đào tạo</div>
+      <table>${noidung.map((nd,i)=>`<tr><td style="width:24px;color:#C0392B;font-weight:700">${i+1}</td><td>${nd}</td></tr>`).join('')}</table>
+    </div>
+    <div class="bb-section">
+      <div class="bb-section-title">Danh sách nhân viên & chữ ký</div>
+      <table>
+        <thead><tr><th>#</th><th>Họ tên</th><th>Chữ ký xác nhận</th></tr></thead>
+        <tbody>${nvRows}</tbody>
+      </table>
+    </div>
+    ${bb.photo ? `<div class="bb-section"><div class="bb-section-title">Ảnh xác nhận</div><img class="bb-selfie" src="${bb.photo}"></div>` : ''}
+    <div class="bb-sig-grid">
+      <div class="bb-sig-box"><div class="role">Đội Setup</div>${bb.sigSetup ? `<img src="${bb.sigSetup}" style="height:60px;object-fit:contain;width:100%">` : ''}<div style="font-size:10px;margin-top:6px;font-weight:600">${bb.setup||''}</div></div>
+      <div class="bb-sig-box"><div class="role">Chủ / QL Cửa Hàng</div>${bb.sigOwner ? `<img src="${bb.sigOwner}" style="height:60px;object-fit:contain;width:100%">` : ''}<div style="font-size:10px;margin-top:6px;font-weight:600">${bb.owner||''}</div></div>
+      <div class="bb-sig-box"><div class="role">Phúc Tea · Ops</div><div style="height:60px;display:flex;align-items:center;justify-content:center;color:#BDC3C7;font-size:10px">Xác nhận từ hệ thống</div><div style="font-size:10px;margin-top:6px;color:#95A5A6">${bb.savedAt||''}</div></div>
+    </div>
+    <div class="bb-footer">Tài liệu nội bộ · Phúc Tea Operations · Xuất lúc ${bb.savedAt||''}</div>`;
+}
+
 function printBBHtml(htmlContent, code, date) {
   const safeCode = (code || 'bienban').replace(/[^a-zA-Z0-9]/g,'_');
   // Dùng iframe ẩn thay window.open để tránh popup blocker
@@ -1954,20 +2053,39 @@ async function saveBienBanOnly() {
 
   const btn = document.getElementById('bb-btn-save');
   btn.disabled = true;
-  btn.textContent = '⏳ Đang lưu...';
+  btn.textContent = '⏳ Đang xử lý...';
 
-  const bbContent = document.getElementById('bb-preview').innerHTML;
-  await saveBienBan({
-    code, date, setup, owner,
-    nvCount: nvList.length,
-    htmlContent: bbContent,
-    savedAt: new Date().toLocaleString('vi-VN'),
+  // Thu thập chữ ký
+  const sigSetupData = document.getElementById('sig-setup') ? document.getElementById('sig-setup').toDataURL() : '';
+  const sigOwnerData = document.getElementById('sig-owner') ? document.getElementById('sig-owner').toDataURL() : '';
+  const nvSigs = nvList.map((_,i) => {
+    const c = document.getElementById('sig-nv-'+i);
+    return c ? c.toDataURL() : '';
   });
+
+  // Nén ảnh selfie
+  btn.textContent = '⏳ Nén ảnh...';
+  const photoCompressed = photoDataUrl ? await compressPhoto(photoDataUrl) : '';
+
+  // Serialize toàn bộ dữ liệu biên bản
+  const bbPayload = {
+    code, date, setup, owner,
+    nvList,
+    nvCount: nvList.length,
+    sigSetup: sigSetupData,
+    sigOwner: sigOwnerData,
+    nvSigs,
+    photo: photoCompressed,
+    htmlContent: document.getElementById('bb-preview').innerHTML,
+    savedAt: new Date().toLocaleString('vi-VN'),
+  };
+
+  btn.textContent = '⏳ Đang lưu...';
+  await saveBienBan(bbPayload);
 
   showToast('✅ Đã lưu! Vào tab Biên Bản để xem và xuất PDF.','success');
   btn.textContent = '💾 Lưu biên bản';
   btn.disabled = false;
-  // Tự đóng modal sau 1 giây
   setTimeout(() => closeModal('modal-bienban'), 1000);
 }
 
