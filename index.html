@@ -498,11 +498,11 @@ body{font-family:'Be Vietnam Pro',sans-serif;background:#F0F2F5;color:var(--dark
     </div>
   </div>
 
-  <div style="margin-top:20px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-    <button onclick="openBienBan()" style="background:linear-gradient(135deg,var(--red),var(--dred));color:white;border:none;border-radius:12px;padding:14px 28px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(192,57,43,0.3);transition:transform .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+  <div class="checklist-grid" style="margin-top:16px">
+    <button onclick="openBienBan()" style="background:linear-gradient(135deg,var(--red),var(--dred));color:white;border:none;border-radius:12px;padding:16px 20px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(192,57,43,0.3);transition:transform .15s;width:100%;text-align:center;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
       📋 Lập Biên Bản Ký Xác Nhận Đào Tạo
     </button>
-    <button onclick="exportKitPDF()" style="background:linear-gradient(135deg,#2C3E50,#1A1A2E);color:white;border:none;border-radius:12px;padding:14px 28px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.2);transition:transform .15s;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+    <button onclick="exportKitPDF()" style="background:linear-gradient(135deg,#2C3E50,#1A1A2E);color:white;border:none;border-radius:12px;padding:16px 20px;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.2);transition:transform .15s;width:100%;text-align:center;" onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
       📄 Xuất Bộ Kit PDF
     </button>
   </div>
@@ -1354,9 +1354,10 @@ function renderDashboard(rows) {
   const cls={"ĐẠT":"dat","TRUNG BÌNH":"can","CHƯA ĐẠT":"chua"};
   body.innerHTML=rows.map(r=>{
     const kpiBadge   = r.kpi && r.kpi!=="—" ? `<span class="badge-kpi ${cls[r.kpi]||'dat'}">${r.kpi}</span>` : "—";
-    const upsellDisp = r.upsellRate ? `<strong style="color:${+r.upsellRate>=25?'var(--green)':'var(--red)'}">${r.upsellRate}%</strong>` : "—";
-    const cupPctDisp = r.ly1lCupRate ? `<strong style="color:${+r.ly1lCupRate>=60?'var(--green)':'var(--red)'}">${r.ly1lCupRate}%</strong>` : "—";
-    const loyalDisp  = r.loyalty!==undefined && r.loyalty!=="" ? `<strong style="color:${+r.loyalty>=85?'var(--green)':'var(--red)'}">${r.loyalty}%</strong>` : "—";
+    const _pn = v => +String(v||'').replace(',','.');
+    const upsellDisp = r.upsellRate ? `<strong style="color:${_pn(r.upsellRate)>=25?'var(--green)':'var(--red)'}">${r.upsellRate}%</strong>` : "—";
+    const cupPctDisp = r.ly1lCupRate ? `<strong style="color:${_pn(r.ly1lCupRate)>=60?'var(--green)':'var(--red)'}">${r.ly1lCupRate}%</strong>` : "—";
+    const loyalDisp  = r.loyalty!==undefined && r.loyalty!=="" ? `<strong style="color:${_pn(r.loyalty)>=85?'var(--green)':'var(--red)'}">${r.loyalty}%</strong>` : "—";
     return `<tr>
       <td><strong>${r.store||"—"}</strong></td>
       <td>${r.date||"—"}</td>
@@ -1377,12 +1378,13 @@ function renderDashboard(rows) {
 
 function updateStats(rows) {
   document.getElementById("s-stores").textContent=new Set(rows.map(r=>r.store).filter(Boolean)).size||"—";
-  // Tỷ lệ bán Ly 1L TB = TB (ly1lSold / tổng ly trừ CF+online) các CH có đủ số liệu
-  const cupRates=rows.map(r=>+r.ly1lCupRate).filter(v=>!isNaN(v)&&v>0);
-  document.getElementById("s-total-ly1l").textContent=cupRates.length?(cupRates.reduce((a,b)=>a+b,0)/cupRates.length).toFixed(1):"—";
-  const rates=rows.map(r=>+r.upsellRate).filter(v=>!isNaN(v)&&v>0);
+  // Parse dấu phẩy thập phân (vi-VN) → dấu chấm trước khi tính
+  const pn = v => +String(v||'').replace(',','.');
+  const cupRates=rows.map(r=>pn(r.ly1lCupRate)).filter(v=>!isNaN(v)&&v>0);
+  document.getElementById("s-total-ly1l").textContent=cupRates.length?(cupRates.reduce((a,b)=>a+b,0)/cupRates.length).toFixed(1)+"%":"—";
+  const rates=rows.map(r=>pn(r.upsellRate)).filter(v=>!isNaN(v)&&v>0);
   document.getElementById("s-avg-rate").textContent=rates.length?(rates.reduce((a,b)=>a+b,0)/rates.length).toFixed(1):"—";
-  const loyaltyRates=rows.map(r=>+r.loyalty).filter(v=>!isNaN(v)&&v>0);
+  const loyaltyRates=rows.map(r=>pn(r.loyalty)).filter(v=>!isNaN(v)&&v>0);
   document.getElementById("s-total-sdt").textContent=loyaltyRates.length?(loyaltyRates.reduce((a,b)=>a+b,0)/loyaltyRates.length).toFixed(0)+"%":"—";
 }
 
@@ -1426,8 +1428,10 @@ function showChecklistDetail(code, name, date, days, taskDetails) {
     const allKeys = Object.keys(localStorage);
     // Tìm key khớp với code + ngày + day (bất kể tên người dùng)
     const pattern = `cl_${code.replace(/\s+/g,'_')}`;
+    // Normalize pattern để tìm đúng localStorage key
+    const codeNorm = code.replace(/[\s]+/g,'_').replace(/[^a-zA-Z0-9_\-]/g,'');
     allKeys.forEach(key => {
-      if (key.includes(pattern) && key.includes(`_d${d}_${date}`) && !key.endsWith('_ts') && !key.endsWith('_sent')) {
+      if ((key.includes(pattern) || key.includes(`cl_${codeNorm}`)) && key.includes(`_d${d}_`) && !key.endsWith('_ts') && !key.endsWith('_sent')) {
         try {
           const saved = JSON.parse(localStorage.getItem(key)||'{}');
           const ts = JSON.parse(localStorage.getItem(key+'_ts')||'{}');
@@ -1973,15 +1977,16 @@ function exportKitPDF() {
       .cover::after{content:'';position:absolute;bottom:-80px;left:-80px;width:300px;height:300px;border-radius:50%;background:rgba(245,197,24,0.08);}
       .cover-logo{height:64px;object-fit:contain;margin-bottom:28px;}
       .cover-tag{display:inline-block;background:rgba(245,197,24,0.2);border:1px solid rgba(245,197,24,0.5);color:#F5C518;font-size:10px;font-weight:800;padding:5px 16px;border-radius:20px;letter-spacing:2px;text-transform:uppercase;margin-bottom:20px;}
-      .cover-title{font-size:46px;font-weight:900;color:white;line-height:1.1;margin-bottom:10px;}
+      .cover-title{font-size:38px;font-weight:900;color:white;line-height:1.15;margin-bottom:10px;word-break:keep-all;}
       .cover-title span{color:#F5C518;}
-      .cover-sub{font-size:13px;color:rgba(255,255,255,0.6);margin-bottom:48px;max-width:480px;}
+      .cover-sub{font-size:13px;color:rgba(255,255,255,0.82);margin-bottom:32px;max-width:480px;}
       .cover-divider{width:60px;height:4px;background:linear-gradient(90deg,#C0392B,#F5C518);border-radius:2px;margin-bottom:36px;}
       .cover-info-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:32px;}
       .cover-info-item{background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);border-radius:10px;padding:12px 16px;}
-      .cover-info-label{font-size:9px;font-weight:700;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;}
-      .cover-info-value{font-size:12px;font-weight:700;color:rgba(255,255,255,0.9);}
-      .cover-notice{padding:14px 18px;background:rgba(245,197,24,0.1);border:1px solid rgba(245,197,24,0.3);border-left:4px solid #F5C518;border-radius:0 10px 10px 0;color:rgba(255,255,255,0.75);font-size:11px;line-height:1.8;}
+      .cover-info-label{font-size:9px;font-weight:700;color:rgba(255,255,255,0.65);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:4px;}
+      .cover-info-value{font-size:12.5px;font-weight:800;color:#FFFFFF;}
+      .cover-notice{padding:14px 18px;background:rgba(245,197,24,0.15);border:1px solid rgba(245,197,24,0.4);border-left:4px solid #F5C518;border-radius:0 10px 10px 0;color:rgba(255,255,255,0.88);font-size:11px;line-height:1.8;}
+      .cover-notice strong{color:#F5C518;font-size:12px;}
       .cover-notice strong{color:#F5C518;}
       /* NỘI DUNG */
       .page-break{page-break-before:always;}
