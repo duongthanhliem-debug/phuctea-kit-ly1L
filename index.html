@@ -1875,19 +1875,56 @@ async function loadBienBanList() {
     <div style="text-align:right;margin-bottom:12px">
       <button onclick="clearAllBienBan()" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;font-family:inherit;font-size:11px;font-weight:600;color:var(--gray);cursor:pointer;">🗑 Xóa local</button>
     </div>` +
-    valid.map((bb, i) => `
-    <div class="bb-saved-card">
-      <div class="bb-saved-icon">📋</div>
-      <div class="bb-saved-info">
-        <h4>${bb.code || '—'} ${!bb.htmlContent ? '<span style="font-size:9px;background:#EBF5FB;color:#2471A3;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:4px">Sheets</span>' : ''}</h4>
-        <p>${bb.date || ''} · ${bb.setup || ''} · ${bb.nvCount || 0} nhân viên · ${bb.savedAt||''}</p>
-      </div>
-      <div class="bb-saved-actions">
-        ${bb.htmlContent ? `<button class="bb-action-btn" onclick="previewSavedBB(${i})">👁 Xem</button>` : ''}
-        ${bb.htmlContent ? `<button class="bb-action-btn primary" onclick="exportSavedPDF(${i})">⬇️ PDF</button>` : '<span style="font-size:11px;color:var(--gray);padding:0 8px">Không có file PDF</span>'}
-        <button class="bb-action-btn" onclick="deleteBienBan(${i})" style="color:var(--red);border-color:var(--red)">✕</button>
-      </div>
-    </div>`).join('');
+    valid.map((bb, i) => {
+      // Lưu data vào window._bbCache để access từ onclick
+      if (!window._bbCache) window._bbCache = [];
+      window._bbCache[i] = bb;
+      const hasContent = !!bb.htmlContent;
+      return `<div class="bb-saved-card">
+        <div class="bb-saved-icon">📋</div>
+        <div class="bb-saved-info">
+          <h4>${bb.code || '—'}${!hasContent ? ' <span style="font-size:9px;background:#EBF5FB;color:#2471A3;padding:2px 7px;border-radius:10px;font-weight:600">Sheets</span>' : ''}</h4>
+          <p>${bb.date || ''} · ${bb.setup || ''} · ${bb.nvCount || 0} nhân viên · ${bb.savedAt||''}</p>
+        </div>
+        <div class="bb-saved-actions">
+          ${hasContent ? `<button class="bb-action-btn" onclick="previewSavedBBByIdx(${i})">👁 Xem</button>` : ''}
+          ${hasContent ? `<button class="bb-action-btn primary" onclick="exportSavedPDFByIdx(${i})">⬇️ PDF</button>` : '<span style="font-size:11px;color:var(--gray);padding:0 8px">Không có PDF</span>'}
+          <button class="bb-action-btn" onclick="deleteBienBanByIdx(${i})" style="color:var(--red);border-color:var(--red)">✕</button>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+function previewSavedBBByIdx(i) {
+  const bb = window._bbCache && window._bbCache[i];
+  if (!bb || !bb.htmlContent) { showToast('Không có nội dung để xem','error'); return; }
+  document.getElementById('bb-preview').innerHTML = bb.htmlContent;
+  [1,2,3].forEach(s => { const el = document.getElementById('bb-step-'+s); if(el) el.style.display='none'; });
+  const el4 = document.getElementById('bb-step-4');
+  if (el4) el4.style.display='block';
+  document.getElementById('bb-step-label').textContent = 'Xem lại biên bản đã lưu';
+  document.getElementById('bb-btn-back').style.display = 'none';
+  document.getElementById('bb-btn-next').style.display = 'none';
+  document.getElementById('bb-btn-save').style.display = 'none';
+  openModal('modal-bienban');
+}
+
+function exportSavedPDFByIdx(i) {
+  const bb = window._bbCache && window._bbCache[i];
+  if (!bb || !bb.htmlContent) { showToast('Không có nội dung để xuất','error'); return; }
+  printBBHtml(bb.htmlContent, bb.code || 'bienban', bb.date || '');
+}
+
+function deleteBienBanByIdx(i) {
+  const bb = window._bbCache && window._bbCache[i];
+  if (!bb) return;
+  if (!confirm(`Xóa biên bản "${bb.code}" ngày ${bb.date}?`)) return;
+  // Xóa khỏi localStorage
+  const saved = JSON.parse(localStorage.getItem('bienban_list') || '[]');
+  const newSaved = saved.filter(b => !(b.code === bb.code && b.date === bb.date));
+  localStorage.setItem('bienban_list', JSON.stringify(newSaved));
+  showToast('Đã xóa biên bản local','success');
+  loadBienBanList();
 }
 
 function clearAllBienBan() {
