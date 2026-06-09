@@ -1255,16 +1255,23 @@ async function loadChecklist() {
       return;
     }
 
-    // Nhóm theo mã CH + ngày
+    // Nhóm theo mã CH + tên người thực hiện (Cách A)
+    // Ngày 2 có thể báo hôm sau → dùng ngày nhỏ nhất làm đại diện
     const map = {};
     rows.forEach(r => {
-      const key = `${r[1]}__${r[3]}`; // mã CH + ngày
+      const key = `${r[1]}__${r[2]}`; // mã CH + tên người
       if (!map[key]) map[key] = { code: r[1], name: r[2], date: r[3], days: {} };
-      map[key].days[r[4]] = {
-        done: +r[5]||0,
-        total: +r[6]||0,
-        checklistStr: r[7]||''  // cột H = chi tiết từng task
-      };
+      // Lấy ngày nhỏ nhất (ngày đầu tiên) làm đại diện
+      if (r[3] && (!map[key].date || r[3] < map[key].date)) map[key].date = r[3];
+      // Lấy dòng mới nhất cho mỗi day (done cao nhất = lần cuối xác nhận)
+      const dayKey = r[4];
+      if (!map[key].days[dayKey] || (+r[5]||0) >= (map[key].days[dayKey].done||0)) {
+        map[key].days[dayKey] = {
+          done: +r[5]||0,
+          total: +r[6]||0,
+          checklistStr: r[7]||''
+        };
+      }
     });
 
     const cards = Object.values(map);
@@ -1778,30 +1785,66 @@ async function saveBienBan(bbData) {
 async function loadBienBanList() {
   const body = document.getElementById('bb-list-body');
   if (!body) return;
+  body.innerHTML = '<div class="bb-empty">⏳ Đang tải...</div>';
 
-  const saved = JSON.parse(localStorage.getItem('bienban_list') || '[]');
-  // Chỉ hiển thị biên bản có htmlContent (đã lưu đầy đủ, không phải nháp)
-  const valid = saved.filter(bb => bb.htmlContent && bb.code && bb.code.length > 1);
+  // Load từ Google Sheets BIEN_BAN
+  let sheetRows = [];
+  if (SHEET_ID && SHEET_ID !== "PASTE_YOUR_SHEET_ID_HERE") {
+    try {
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=BIEN_BAN`;
+      const text = await (await fetch(url)).text();
+      sheetRows = parseCSV(text).slice(1).filter(r => r[1]); // bỏ header, lọc có mã CH
+    } catch(e) {}
+  }
 
-  if (!valid.length) {
+  // Merge: Sheet rows + localStorage (ưu tiên localStorage vì có htmlContent)
+  const localSaved = JSON.parse(localStorage.getItem('bienban_list') || '[]');
+  const localValid = localSaved.filter(bb => bb.htmlContent && bb.code && bb.code.length > 1);
+
+  // Tạo list hiển thị: Sheet rows + local (tránh trùng theo code+date)
+  const displayList = [];
+
+  // Thêm từ Sheet trước
+  sheetRows.forEach(r => {
+    const code = r[1], date = r[2], setup = r[3], nvCount = r[4];
+    if (!code) return;
+    // Kiểm tra có bản local không
+    const localMatch = localValid.find(b => b.code === code && b.date === date);
+    displayList.push({
+      code, date, setup, nvCount,
+      savedAt: r[0],
+      htmlContent: localMatch ? localMatch.htmlContent : null,
+      source: localMatch ? 'local' : 'sheet'
+    });
+  });
+
+  // Thêm local không có trong Sheet
+  localValid.forEach(bb => {
+    const already = displayList.find(d => d.code === bb.code && d.date === bb.date);
+    if (!already) displayList.push({...bb, source: 'local'});
+  });
+
+  if (!displayList.length) {
     body.innerHTML = '<div class="bb-empty">📋 Chưa có biên bản nào được lưu.<br><small style="color:var(--gray)">Tạo biên bản trong tab Bộ Kit → bấm 💾 Lưu để lưu lại.</small></div>';
     return;
   }
 
+  const valid = displayList;
+
   body.innerHTML = `
     <div style="text-align:right;margin-bottom:12px">
-      <button onclick="clearAllBienBan()" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;font-family:inherit;font-size:11px;font-weight:600;color:var(--gray);cursor:pointer;">🗑 Xóa tất cả</button>
+      <button onclick="clearAllBienBan()" style="background:none;border:1.5px solid var(--border);border-radius:8px;padding:6px 14px;font-family:inherit;font-size:11px;font-weight:600;color:var(--gray);cursor:pointer;">🗑 Xóa local</button>
     </div>` +
     valid.map((bb, i) => `
     <div class="bb-saved-card">
       <div class="bb-saved-icon">📋</div>
       <div class="bb-saved-info">
-        <h4>${bb.code || '—'}</h4>
-        <p>${bb.date || ''} · ${bb.setup || ''} · ${bb.nvCount || 0} nhân viên · Lưu lúc ${bb.savedAt||''}</p>
+        <h4>${bb.code || '—'} ${!bb.htmlContent ? '<span style="font-size:9px;background:#EBF5FB;color:#2471A3;padding:2px 7px;border-radius:10px;font-weight:600;margin-left:4px">Sheets</span>' : ''}</h4>
+        <p>${bb.date || ''} · ${bb.setup || ''} · ${bb.nvCount || 0} nhân viên · ${bb.savedAt||''}</p>
       </div>
       <div class="bb-saved-actions">
-        <button class="bb-action-btn" onclick="previewSavedBB(${i})">👁 Xem</button>
-        <button class="bb-action-btn primary" onclick="exportSavedPDF(${i})">⬇️ PDF</button>
+        ${bb.htmlContent ? `<button class="bb-action-btn" onclick="previewSavedBB(${i})">👁 Xem</button>` : ''}
+        ${bb.htmlContent ? `<button class="bb-action-btn primary" onclick="exportSavedPDF(${i})">⬇️ PDF</button>` : '<span style="font-size:11px;color:var(--gray);padding:0 8px">Không có file PDF</span>'}
         <button class="bb-action-btn" onclick="deleteBienBan(${i})" style="color:var(--red);border-color:var(--red)">✕</button>
       </div>
     </div>`).join('');
